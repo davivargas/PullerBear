@@ -1,40 +1,123 @@
 import * as vscode from 'vscode';
+import { summarizeCommits } from './aiService';
+import { getUnexplainedCommits, markCommitAsExplained } from './stateManager';
+import { ExplainerViewProvider, CommitSummary } from './ExplainerViewProvider';
 
-export function update(context: vscode.ExtensionContext) {
-
+export function update(
+    context: vscode.ExtensionContext,
+    provider: ExplainerViewProvider
+) {
     const gitExtension = vscode.extensions.getExtension('vscode.git');
 
-    // Check if the Git extension is available
     if (!gitExtension) {
-        vscode.window.showErrorMessage('Git extension not found. Please install the Git extension to use PullerBear.');
+        vscode.window.showErrorMessage(
+            'Git extension not found. Please install the Git extension to use PullerBear.'
+        );
         return;
     }
 
-    // Get the Git API
     const git = gitExtension.exports.getAPI(1);
 
-    git.onDidOpenRepository((repository: any) => {
+    const handleRepository = async (repository: any) => {
+        try {
+            // Fetch from remote
+            await repository.fetch();
+            console.log('[PullerBear] Fetched latest from remote.');
 
-        // Start pulling at a regular interval (e.g., every 5 minutes)
-        const pullRate = setInterval(() => {
-            try {
-                repository.fetch();
+            const head = repository.state.HEAD;
+            if (!head || !head.behind || head.behind === 0) {
+                console.log('[PullerBear] Already up to date.');
+                return;
+            }
 
-                const head = repository.state.HEAD;
-                if (head && head.behind > 0) {
-                    vscode.window.showInformationMessage('Remote changes detected, you\'re behind by ' + head.behind + ' commits. Pulling changes...');
+            const behindCount: number = head.behind;
+
+            // Get the list of commits we are behind
+            const log: { hash: string; message: string }[] =
+                await repository.log({
+                    maxEntries: behindCount,
+                    range: `HEAD..${head.upstream}`,
+                });
+
+            if (!log || log.length === 0) {
+                return;
+            }
+
+            // Filter to only commits we haven't summarized yet
+            const hashes = log.map(c => c.hash);
+            const newHashes = getUnexplainedCommits(context, hashes);
+
+            if (newHashes.length === 0) {
+                // Already summarized — just prompt the user to pull
+                promptPull(repository, behindCount);
+                return;
+            }
+
+            const newCommits = log.filter(c => newHashes.includes(c.hash));
+            const messages = newCommits.map(c => c.message);
+
+            // Get diffs for the new commits (best-effort)
+            const diffs: string[] = [];
+            for (const commit of newCommits.slice(0, 3)) {
+                try {
+                    const diff: string = await repository.show(commit.hash);
+                    diffs.push(diff.slice(0, 500));
+                } catch (_) {
+                    // diff unavailable for this commit
                 }
-
             }
-            catch (error) {
-                vscode.window.showErrorMessage('Error fetching repository');
+
+            // Summarize using AI
+            const summaryText = await summarizeCommits(messages, diffs);
+
+            // Store in state and show in sidebar
+            for (const commit of newCommits) {
+                await markCommitAsExplained(context, commit.hash);
+                const summary: CommitSummary = {
+                    hash: commit.hash,
+                    message: commit.message,
+                    summary: summaryText,
+                    timestamp: Date.now(),
+                };
+                provider.addSummary(summary);
             }
-        }, 5 * 60 * 1000); // 5 minutes
 
-        // Clean up the interval when the repository is closed
-        repository.onDidClose(() => {
-            clearInterval(pullRate);
-        });
+            // Notify the user
+            const action = await vscode.window.showInformationMessage(
+                `🐻 PullerBear: You are ${behindCount} commit(s) behind. See the "What's New" panel for a summary.`,
+                'Git Pull',
+                'Dismiss'
+            );
 
+            if (action === 'Git Pull') {
+                await vscode.commands.executeCommand('git.pull');
+            }
+
+        } catch (error) {
+            console.error('[PullerBear] Error during update:', error);
+            vscode.window.showErrorMessage('PullerBear: Error checking for updates.');
+        }
+    };
+
+    // Trigger on new repository open
+    git.onDidOpenRepository((repository: any) => {
+        handleRepository(repository);
+    });
+
+    // Also trigger for already-open repositories
+    for (const repo of git.repositories) {
+        handleRepository(repo);
+    }
+}
+
+function promptPull(repository: any, behindCount: number) {
+    vscode.window.showInformationMessage(
+        `🐻 PullerBear: You are ${behindCount} commit(s) behind the remote.`,
+        'Git Pull',
+        'Dismiss'
+    ).then(action => {
+        if (action === 'Git Pull') {
+            vscode.commands.executeCommand('git.pull');
+        }
     });
 }
