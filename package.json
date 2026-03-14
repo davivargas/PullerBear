@@ -11,13 +11,34 @@
   ],
   "activationEvents": [],
   "main": "./dist/extension.js",
+  "extensionDependencies": [
+    "vscode.git"
+  ],
   "contributes": {
     "commands": [
       {
         "command": "pullerbear.helloWorld",
         "title": "Hello World"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "pullerbear-sidebar",
+          "title": "PullerBear",
+          "icon": "resources/pullerbear.svg"
+        }
+      ]
+    },
+    "views": {
+      "pullerbear-sidebar": [
+        {
+          "type": "webview",
+          "id": "pullerbear.explainerView",
+          "name": "What's New"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -36,6 +57,8 @@
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@types/vscode": "^1.110.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
@@ -46,6 +69,8 @@
     "typescript-eslint": "^8.56.1"
   },
   "dependencies": {
-    "@openrouter/sdk": "^0.9.11"
+    "@openrouter/sdk": "^0.9.11",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   }
 }
