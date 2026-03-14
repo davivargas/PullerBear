@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { analyzeCode } from '../ai/aiClient';
 
 export function gitMonitor(context: vscode.ExtensionContext) {
 
@@ -23,6 +24,18 @@ export function gitMonitor(context: vscode.ExtensionContext) {
                 const head = repository.state.HEAD;
                 if (head && head.behind > 0) {
                     vscode.window.showInformationMessage('Remote changes detected, you\'re behind by ' + head.behind + ' commits. Pulling changes...');
+                    
+                    analyzeCode({
+                        branchName: head.name,
+                        diffText: repository.diff()
+                    }).then((analysis) => {
+                        // Process the analysis results and display them to the user
+                        console.log('Analysis results:', analysis);
+                        vscode.window.showInformationMessage('Code analysis completed. Check the console for details.');
+                    }).catch((error) => {
+                        console.error('Error analyzing code:', error);
+                        vscode.window.showErrorMessage('Error analyzing code changes');
+                    });
                 }
 
             }
