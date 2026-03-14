@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { update } from './update';
+import { gitMonitor } from './gitTools/gitMonitor';
 import { ExplainerViewProvider } from './ExplainerViewProvider';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -14,8 +14,8 @@ export function activate(context: vscode.ExtensionContext) {
         )
     );
 
-    // Start the git fetch & summarize loop
-    update(context, provider);
+    // Start the git monitor (fetch + summarize + notify)
+    gitMonitor(context, provider);
 }
 
 export function deactivate() {}
