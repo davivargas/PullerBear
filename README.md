@@ -1,8 +1,8 @@
 # PullerBear
 A git pull alert and explainer
-# pullbear README
+# pullerbear README
 
-This is the README for your extension "pullbear". After writing up a brief description, we recommend including the following sections.
+This is the README for your extension "pullerbear". After writing up a brief description, we recommend including the following sections.
 
 ## Features
 

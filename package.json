@@ -14,7 +14,7 @@
   "contributes": {
     "commands": [
       {
-        "command": "pullbear.helloWorld",
+        "command": "pullerbear.helloWorld",
         "title": "Hello World"
       }
     ]
