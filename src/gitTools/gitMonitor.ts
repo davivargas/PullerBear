@@ -13,7 +13,7 @@ export function gitMonitor(
         vscode.window.showErrorMessage(
             'Git extension not found. Please install the Git extension to use PullerBear.'
         );
-        return;
+        return { refresh: () => {} };
     }
 
     // Get the Git API
@@ -39,7 +39,7 @@ export function gitMonitor(
             if (!head.behind || head.behind === 0) {
                 // Explicitly notify the user that they are up to date
                 vscode.window.showInformationMessage(
-                    '🐻‍❄️ PullerBear: You\'re up to date! No new commits on the remote.'
+                    "🐻‍❄️ PullerBear: You're up to date! No new commits on the remote."
                 );
                 return;
             }
@@ -105,4 +105,13 @@ export function gitMonitor(
     for (const repo of git.repositories) {
         checkRepository(repo);
     }
+
+    // Return a refresh function
+    return {
+        refresh: () => {
+            for (const repo of git.repositories) {
+                checkRepository(repo);
+            }
+        }
+    };
 }

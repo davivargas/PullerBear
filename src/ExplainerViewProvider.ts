@@ -1,6 +1,4 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
 
 export interface CommitSummary {
     hash: string;
@@ -14,8 +12,13 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
 
     private _view?: vscode.WebviewView;
     private _summaries: CommitSummary[] = [];
+    private _refreshCallback?: () => void;
 
     constructor(private readonly _extensionUri: vscode.Uri) {}
+
+    public setRefreshCallback(callback: () => void) {
+        this._refreshCallback = callback;
+    }
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -35,6 +38,13 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
         webviewView.webview.onDidReceiveMessage(data => {
             if (data.type === 'ready') {
                 // Send current summaries on load
+                this._pushSummaries();
+            } else if (data.type === 'reload') {
+                // Refresh summaries
+                if (this._refreshCallback) {
+                    this._refreshCallback();
+                }
+                // Also push current summaries (though refresh might trigger more)
                 this._pushSummaries();
             }
         });
