@@ -1,7 +1,5 @@
-<<<<<<< HEAD
 # PullerBear
 A git pull alert and explainer
-=======
 # pullbear README
 
 This is the README for your extension "pullbear". After writing up a brief description, we recommend including the following sections.
@@ -73,4 +71,3 @@ You can author your README using Visual Studio Code. Here are some useful editor
 * [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
 
 **Enjoy!**
->>>>>>> 3dca93874eb0affe5355b7a17def631b9fe3c03f
