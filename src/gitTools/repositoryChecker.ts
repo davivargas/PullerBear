@@ -375,116 +375,150 @@ export async function checkRepository(
     isManual: boolean = false
 ): Promise<void>
 {
-    if (state.isChecking)
+    // Use a queue to prevent race conditions between interval and manual checks
+    if (state.checkQueue)
     {
-        console.log('[PullerBear] checkRepository skipped: already checking');
-        return;
+        // If a check is already queued or running, skip this one
+        // unless it's a manual check, which should wait for the current one to complete
+        if (!isManual)
+        {
+            console.log('[PullerBear] checkRepository skipped: check already queued');
+            return;
+        }
+        // For manual checks, wait for the current check to finish then run
+        await state.checkQueue;
     }
 
-    state.isChecking = true;
-
-    try
+    const runCheck = async (): Promise<void> =>
     {
-        const config = getPullerBearConfig();
-        const windowMs = config.commitWindowMinutes * 60 * 1000;
-
-        // Fetch all branches from all remotes
-        await repository.fetch();
-        console.log('[PullerBear] Fetched latest from remote.');
-
-        const head = repository.state?.HEAD;
-
-        const targetRef = resolveTargetBranchRef(head, config.branchRef);
-        const isUpstreamTarget = isCurrentUpstreamTarget(head, targetRef);
-
-        if (!isUpstreamTarget && isManual)
+        try
         {
-            showConfiguredBranchChangesMessage(targetRef);
-        }
-
-        const targetSha = await getTargetCommitHash(repository, targetRef);
-        const dedupKey = targetSha;
-
-        if (provider.hasSummary(dedupKey))
-        {
-            console.log(`[PullerBear] checkRepository skipped: dedup hit for ${dedupKey}`);
-            if (isManual)
+            if (state.isChecking)
             {
-                vscode.window.showInformationMessage(
-                    '🐻‍❄️ PullerBear: No new commits to summarize.'
-                );
-            }
-            return;
-        }
-
-        const currentBehind = isUpstreamTarget ? (head?.behind ?? 0) : 1;
-        const newIncomingCommits = calculateNewCommits(currentBehind, state.lastBehindCount);
-
-        state.lastBehindCount = currentBehind;
-
-        // Add new commit timestamps
-        addNewCommitTimestamps(state, newIncomingCommits);
-
-        // Get commits in window (also prunes old ones)
-        const commitsInWindow = getCommitsInWindow(state.commitTimestamps, windowMs);
-
-        if (isUpstreamTarget && currentBehind <= 0)
-        {
-            console.log('[PullerBear] checkRepository skipped: upstream target not behind');
-            if (isManual)
-            {
-                vscode.window.showInformationMessage(
-                    '🐻‍❄️ PullerBear: You\'re all caught up! No new commits to summarize.'
-                );
-            }
-            return;
-        }
-
-        if (exceedsHardStopThreshold(commitsInWindow, config))
-        {
-            console.log('[PullerBear] checkRepository skipped: hard stop threshold exceeded');
-            showHardStopMessage(commitsInWindow, config);
-            return;
-        }
-
-        if (exceedsWarningThreshold(commitsInWindow, config))
-        {
-            const shouldContinue = await showWarningMessage(commitsInWindow, config);
-
-            if (!shouldContinue)
-            {
-                console.log('[PullerBear] checkRepository skipped: user canceled warning prompt');
+                console.log('[PullerBear] checkRepository skipped: already checking');
                 return;
             }
+
+            state.isChecking = true;
+
+            const config = getPullerBearConfig();
+            const windowMs = config.commitWindowMinutes * 60 * 1000;
+
+            // Fetch all branches from all remotes
+            try
+            {
+                await repository.fetch();
+                console.log('[PullerBear] Fetched latest from remote.');
+            }
+            catch (fetchError)
+            {
+                console.error('[PullerBear] Fetch failed:', fetchError);
+                vscode.window.showWarningMessage(
+                    '🐻‍❄️ PullerBear: Failed to fetch from remote. Check your network connection.'
+                );
+                state.isChecking = false;
+                return;
+            }
+
+            const head = repository.state?.HEAD;
+
+            const targetRef = resolveTargetBranchRef(head, config.branchRef);
+            const isUpstreamTarget = isCurrentUpstreamTarget(head, targetRef);
+
+            if (!isUpstreamTarget && isManual)
+            {
+                showConfiguredBranchChangesMessage(targetRef);
+            }
+
+            const targetSha = await getTargetCommitHash(repository, targetRef);
+            const dedupKey = targetSha;
+
+            if (provider.hasSummary(dedupKey))
+            {
+                console.log(`[PullerBear] checkRepository skipped: dedup hit for ${dedupKey}`);
+                if (isManual)
+                {
+                    vscode.window.showInformationMessage(
+                        '🐻‍❄️ PullerBear: No new commits to summarize.'
+                    );
+                }
+                return;
+            }
+
+            const currentBehind = isUpstreamTarget ? (head?.behind ?? 0) : 1;
+            const newIncomingCommits = calculateNewCommits(currentBehind, state.lastBehindCount);
+
+            state.lastBehindCount = currentBehind;
+
+            // Add new commit timestamps
+            addNewCommitTimestamps(state, newIncomingCommits);
+
+            // Get commits in window (also prunes old ones)
+            const commitsInWindow = getCommitsInWindow(state.commitTimestamps, windowMs);
+
+            if (isUpstreamTarget && currentBehind <= 0)
+            {
+                console.log('[PullerBear] checkRepository skipped: upstream target not behind');
+                if (isManual)
+                {
+                    vscode.window.showInformationMessage(
+                        '🐻‍❄️ PullerBear: You\'re all caught up! No new commits to summarize.'
+                    );
+                }
+                return;
+            }
+
+            if (exceedsHardStopThreshold(commitsInWindow, config))
+            {
+                console.log('[PullerBear] checkRepository skipped: hard stop threshold exceeded');
+                showHardStopMessage(commitsInWindow, config);
+                return;
+            }
+
+            if (exceedsWarningThreshold(commitsInWindow, config))
+            {
+                const shouldContinue = await showWarningMessage(commitsInWindow, config);
+
+                if (!shouldContinue)
+                {
+                    console.log('[PullerBear] checkRepository skipped: user canceled warning prompt');
+                    return;
+                }
+            }
+
+            const behindCount: number = currentBehind;
+
+            if (isUpstreamTarget)
+            {
+                showRemoteChangesMessage(behindCount);
+            }
+            else
+            {
+                showConfiguredBranchChangesMessage(targetRef);
+            }
+
+            // Run AI analysis and push results to the sidebar
+            console.log(`[PullerBear] Running AI analysis with target ${targetRef} and sha ${targetSha}`);
+            const summary = await runAIAnalysis(repository, head, targetRef, targetSha, behindCount);
+
+            if (summary)
+            {
+                provider.addSummary(summary);
+            }
         }
-
-        const behindCount: number = currentBehind;
-
-        if (isUpstreamTarget)
+        catch (error)
         {
-            showRemoteChangesMessage(behindCount);
+            console.error('[PullerBear] Error fetching repository:', error);
+            vscode.window.showErrorMessage('PullerBear: Error fetching repository.');
         }
-        else
+        finally
         {
-            showConfiguredBranchChangesMessage(targetRef);
+            state.isChecking = false;
         }
+    };
 
-        // Run AI analysis and push results to the sidebar
-        console.log(`[PullerBear] Running AI analysis with target ${targetRef} and sha ${targetSha}`);
-        const summary = await runAIAnalysis(repository, head, targetRef, targetSha, behindCount);
-
-        if (summary)
-        {
-            provider.addSummary(summary);
-        }
-    }
-    catch (error)
-    {
-        console.error('[PullerBear] Error fetching repository:', error);
-        vscode.window.showErrorMessage('PullerBear: Error fetching repository.');
-    }
-    finally
-    {
-        state.isChecking = false;
-    }
+    // Store the promise in the queue
+    state.checkQueue = runCheck();
+    await state.checkQueue;
+    state.checkQueue = undefined;
 }

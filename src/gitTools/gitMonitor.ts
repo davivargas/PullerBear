@@ -66,7 +66,12 @@ function initializeRepositoryMonitor(
         if (currentCommit && currentCommit !== state.lastHeadCommit)
         {
             // HEAD moved forward — if we were behind, this is likely a pull/merge
-            if (state.lastBehindCount > 0 && currentBehind < state.lastBehindCount)
+            // Also detect if behind went to 0 (user manually pulled)
+            const wasBehind = state.lastBehindCount > 0;
+            const behindDecreased = currentBehind < state.lastBehindCount;
+            const nowUpToDate = currentBehind === 0 && wasBehind;
+
+            if (behindDecreased || nowUpToDate)
             {
                 console.log(
                     `[PullerBear] Pull detected: HEAD moved from ${state.lastHeadCommit} to ${currentCommit}. ` +
@@ -83,12 +88,21 @@ function initializeRepositoryMonitor(
         }
     });
 
-    // Handle configuration changes
+    // Handle configuration changes with debounce
+    let configTimeout: NodeJS.Timeout | undefined;
     const configChangeDisposable = vscode.workspace.onDidChangeConfiguration((event) =>
     {
         if (event.affectsConfiguration('pullerbear'))
         {
-            startMonitor(repository, state, checkFn);
+            // Debounce config changes to avoid creating multiple intervals
+            if (configTimeout)
+            {
+                clearTimeout(configTimeout);
+            }
+            configTimeout = setTimeout(() =>
+            {
+                startMonitor(repository, state, checkFn);
+            }, 500);
         }
     });
 
@@ -97,11 +111,13 @@ function initializeRepositoryMonitor(
 
     if (typeof repository.onDidClose === 'function')
     {
-        clearMonitorInterval(state);
-        stateChangeDisposable.dispose();
-        configChangeDisposable.dispose();
-        closeDisposable.dispose();
-    });
+        closeDisposable = repository.onDidClose(() => {
+            clearMonitorInterval(state);
+            stateChangeDisposable.dispose();
+            configChangeDisposable.dispose();
+            closeDisposable.dispose();
+        });
+    };
 
     context.subscriptions.push(stateChangeDisposable, configChangeDisposable, closeDisposable);
 }

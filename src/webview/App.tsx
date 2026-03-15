@@ -67,6 +67,7 @@ export function App() {
                 )}
             </div>
 
+{/* Input functionality reserved for future implementation
             <div style={styles.inputContainer}>
                 <input
                     type="text"
@@ -75,16 +76,29 @@ export function App() {
                 />
                 <button style={styles.button}>Send</button>
             </div>
+            */}
         </div>
     );
 }
 
 /** Minimal inline markdown → HTML converter for the summary field */
+function escapeHtml(text: string): string
+{
+    const map: Record<string, string> = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, (m) => map[m]);
+}
+
 function markdownToHtml(md: string): string {
-    return md
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
+    // First escape HTML to prevent XSS
+    let escaped = escapeHtml(md);
+    // Then apply markdown transformations
+    return escaped
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
         .replace(/`(.*?)`/g, '<code>$1</code>')

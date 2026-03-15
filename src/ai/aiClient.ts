@@ -23,6 +23,7 @@ export async function analyzeCode(context: diffContext): Promise<any> {
       model: 'minimax/minimax-m2.5',
       messages: prompt,
     }),
+    signal: AbortSignal.timeout(30000),
   });
 
   if (!response.ok) {

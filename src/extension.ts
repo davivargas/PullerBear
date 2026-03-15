@@ -8,12 +8,15 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Check if API key is configured
     const config = getPullerBearConfig();
-    if (!config.apiKey) {
+    const hasShownWarning = context.workspaceState.get<boolean>('hasShownApiKeyWarning', false);
+    if (!config.apiKey && !hasShownWarning) {
         vscode.window.showWarningMessage(
             '🐻‍❄️ PullerBear: No API key configured. ' +
             'Please set pullerBear.apiKey in VS Code settings to enable AI summaries. ' +
             'Get your free API key at https://openrouter.ai/settings/keys'
         );
+        // Only show the warning once per workspace
+        context.workspaceState.update('hasShownApiKeyWarning', true);
     }
 
     // Register the "What's New" sidebar webview
