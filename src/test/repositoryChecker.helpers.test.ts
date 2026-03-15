@@ -1,0 +1,119 @@
+import * as assert from 'assert/strict';
+import * as vscode from 'vscode';
+import * as repositoryChecker from '../gitTools/repositoryChecker';
+import { stubMethod, withFixedDateNow } from './helpers/testUtils';
+
+suite('repositoryChecker helper functions', () =>
+{
+    test('hasUpstreamBranch detects configured upstreams', () =>
+    {
+        assert.equal(repositoryChecker.hasUpstreamBranch({ upstream: { name: 'main' } }), true);
+        assert.equal(repositoryChecker.hasUpstreamBranch({}), false);
+        assert.equal(repositoryChecker.hasUpstreamBranch(undefined), false);
+    });
+
+    test('notification helpers send user-facing information and warnings', async () =>
+    {
+        const infoMessages: string[] = [];
+        const warningMessages: Array<{ message: string; items: string[] }> = [];
+
+        const restoreInfo = stubMethod(
+            vscode.window,
+            'showInformationMessage',
+            ((message: string) =>
+            {
+                infoMessages.push(message);
+                return Promise.resolve(undefined);
+            }) as typeof vscode.window.showInformationMessage
+        );
+        const restoreWarn = stubMethod(
+            vscode.window,
+            'showWarningMessage',
+            ((message: string, ...items: any[]) =>
+            {
+                warningMessages.push({
+                    message,
+                    items: items.filter((item) => typeof item === 'string')
+                });
+                return Promise.resolve('Continue');
+            }) as typeof vscode.window.showWarningMessage
+        );
+
+        try
+        {
+            repositoryChecker.showNoUpstreamMessage();
+            repositoryChecker.showUpToDateMessage();
+            repositoryChecker.showRemoteChangesMessage(3);
+            repositoryChecker.showHardStopMessage(6, {
+                commitWindowMinutes     : 60,
+                fetchIntervalMinutes    : 5,
+                hardStopCommitThreshold : 5,
+                warningCommitThreshold  : 2,
+                branchRef               : 'main'
+            });
+
+            const shouldContinue = await repositoryChecker.showWarningMessage(3, {
+                commitWindowMinutes     : 60,
+                fetchIntervalMinutes    : 5,
+                hardStopCommitThreshold : 5,
+                warningCommitThreshold  : 2,
+                branchRef               : 'main'
+            });
+
+            assert.equal(shouldContinue, true);
+            assert.equal(infoMessages.length, 3);
+            assert.match(infoMessages[0], /No upstream/);
+            assert.match(infoMessages[1], /up to date/i);
+            assert.match(infoMessages[2], /behind by 3/);
+            assert.match(warningMessages[0].message, /paused summarization/);
+            assert.deepEqual(warningMessages[1].items, ['Continue', 'Cancel']);
+        }
+        finally
+        {
+            restoreWarn();
+            restoreInfo();
+        }
+    });
+
+    test('summary builders and threshold checks produce expected outputs', () =>
+    {
+        const head = {
+            commit   : 'abc999',
+            upstream : { remote: 'origin', name: 'main' }
+        };
+
+        const summary = withFixedDateNow(42, () =>
+            repositoryChecker.createCommitSummary(head, 2, 'AI text')
+        );
+        const fallback = withFixedDateNow(77, () =>
+            repositoryChecker.createFallbackSummary(head, 5)
+        );
+
+        assert.deepEqual(summary, {
+            hash      : 'abc999',
+            message   : '2 new commit(s) on origin/main',
+            summary   : 'AI text',
+            timestamp : 42
+        });
+        assert.deepEqual(fallback, {
+            hash      : 'abc999',
+            message   : '5 new commit(s) on origin/main',
+            summary   : 'You are 5 commit(s) behind. AI summary unavailable.',
+            timestamp : 77
+        });
+        assert.equal(repositoryChecker.exceedsHardStopThreshold(5, {
+            commitWindowMinutes     : 60,
+            fetchIntervalMinutes    : 5,
+            hardStopCommitThreshold : 5,
+            warningCommitThreshold  : 2,
+            branchRef               : 'main'
+        }), true);
+        assert.equal(repositoryChecker.exceedsWarningThreshold(2, {
+            commitWindowMinutes     : 60,
+            fetchIntervalMinutes    : 5,
+            hardStopCommitThreshold : 5,
+            warningCommitThreshold  : 2,
+            branchRef               : 'main'
+        }), false);
+    });
+});
