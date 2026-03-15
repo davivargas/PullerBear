@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { ExplainerViewProvider } from '../ExplainerViewProvider';
 import { getPullerBearConfig } from '../config/pullerBearConfig';
 import { RepoMonitorState } from './types';
-import { createRepoState, createRepoStateMap, isRepositoryMonitored, setMonitorInterval, clearMonitorInterval } from './gitState';
+import { createRepoState, createRepoStateMap, isRepositoryMonitored, clearMonitorInterval } from './gitState';
 import { checkRepository } from './repositoryChecker';
 import { clearReviewFile } from '../utl/fileWrite';
 

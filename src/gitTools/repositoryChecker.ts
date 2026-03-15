@@ -12,21 +12,22 @@ import {
     getCommitsInWindow
 } from './commitTracker';
 import { writeToFile } from '../utl/fileWrite';
-import { parseAIResponse } from '../ai/parser';
 
 const execFileAsync = promisify(execFile);
 
 /**
  * Checks if the repository has an upstream branch configured
  */
-export function hasUpstreamBranch(head: any): boolean {
+export function hasUpstreamBranch(head: any): boolean
+{
     return !!(head && head.upstream);
 }
 
 /**
  * Shows a message when no upstream is set
  */
-export function showNoUpstreamMessage(): void {
+export function showNoUpstreamMessage(): void
+{
     vscode.window.showInformationMessage(
         '🐻‍❄️ PullerBear: No upstream branch set for the current branch.'
     );
@@ -35,7 +36,8 @@ export function showNoUpstreamMessage(): void {
 /**
  * Shows a message when the repository is up to date
  */
-export function showUpToDateMessage(): void {
+export function showUpToDateMessage(): void
+{
     vscode.window.showInformationMessage(
         '🐻‍❄️ PullerBear: You\'re up to date! No new commits on the remote.'
     );
@@ -44,7 +46,8 @@ export function showUpToDateMessage(): void {
 /**
  * Shows the hard stop warning message
  */
-export function showHardStopMessage(commitsInWindow: number, config: GitMonitorConfig): void {
+export function showHardStopMessage(commitsInWindow: number, config: GitMonitorConfig): void
+{
     vscode.window.showWarningMessage(
         `🐻‍❄️ PullerBear paused summarization. ` +
         `${commitsInWindow} incoming commit(s) were detected in the last ` +
@@ -59,7 +62,8 @@ export function showHardStopMessage(commitsInWindow: number, config: GitMonitorC
 export async function showWarningMessage(
     commitsInWindow: number,
     config: GitMonitorConfig
-): Promise<boolean> {
+): Promise<boolean>
+{
     const selection = await vscode.window.showWarningMessage(
         `🐻‍❄️ PullerBear detected ${commitsInWindow} incoming commit(s) in the last ` +
         `${config.commitWindowMinutes} minute(s). This repository may be too active ` +
@@ -75,7 +79,8 @@ export async function showWarningMessage(
 /**
  * Shows the remote changes detected message
  */
-export function showRemoteChangesMessage(behindCount: number): void {
+export function showRemoteChangesMessage(behindCount: number): void
+{
     vscode.window.showInformationMessage(
         `🐻‍❄️ PullerBear: Remote changes detected — you're behind by ${behindCount} commit(s).`
     );
@@ -84,7 +89,8 @@ export function showRemoteChangesMessage(behindCount: number): void {
 /**
  * Shows message for configured non-upstream branch updates.
  */
-export function showConfiguredBranchChangesMessage(targetRef: string): void {
+export function showConfiguredBranchChangesMessage(targetRef: string): void
+{
     vscode.window.showInformationMessage(
         `🐻‍❄️ PullerBear: Remote changes detected on ${targetRef}.`
     );
@@ -93,17 +99,21 @@ export function showConfiguredBranchChangesMessage(targetRef: string): void {
 /**
  * Resolves configured target branch ref for comparison.
  */
-export function resolveTargetBranchRef(head: any, branchRef: string): string {
+export function resolveTargetBranchRef(head: any, branchRef: string): string
+{
     const configuredRef = branchRef.trim();
-    if (!configuredRef || configuredRef.toLowerCase() === 'upstream') {
-        if (head?.upstream?.remote && head?.upstream?.name) {
+    if (!configuredRef || configuredRef.toLowerCase() === 'upstream')
+    {
+        if (head?.upstream?.remote && head?.upstream?.name)
+        {
             return `${head.upstream.remote}/${head.upstream.name}`;
         }
 
         return 'origin/main';
     }
 
-    if (configuredRef.includes('/')) {
+    if (configuredRef.includes('/'))
+    {
         return configuredRef;
     }
 
@@ -114,8 +124,10 @@ export function resolveTargetBranchRef(head: any, branchRef: string): string {
 /**
  * Checks whether target ref is the current branch's tracked upstream.
  */
-export function isCurrentUpstreamTarget(head: any, targetRef: string): boolean {
-    if (!hasUpstreamBranch(head)) {
+export function isCurrentUpstreamTarget(head: any, targetRef: string): boolean
+{
+    if (!hasUpstreamBranch(head))
+    {
         return false;
     }
 
@@ -127,7 +139,7 @@ export function isCurrentUpstreamTarget(head: any, targetRef: string): boolean {
  * Looks up the upstream HEAD commit SHA from repository refs.
  */
 export async function getTargetCommitHash(repository: any, targetRef: string): Promise<string> {
-
+    
     try {
         const branch = await repository.getBranch(targetRef);
         if (branch && branch.commit) {
@@ -158,14 +170,12 @@ export function createCommitSummary(
     targetSha: string
 ): CommitSummary
 {
-    const [remoteName, ...branchParts] = targetRef.split('/');
-    const branchName = branchParts.join('/');
     const dedupKey = targetSha;
     return createCommitSummaryObject(
         dedupKey,
         behindCount,
-        remoteName,
-        branchName,
+        targetRef,
+        '',
         summaryText
     );
 }
@@ -189,7 +199,8 @@ export const createCommitSummaryObject = (
 /**
  * Creates a fallback commit summary when AI fails
  */
-export function createFallbackSummary(head: any, behindCount: number, upstreamSha: string, error?: string): CommitSummary {
+export function createFallbackSummary(head: any, behindCount: number, upstreamSha: string, error?: string): CommitSummary
+{
     const dedupKey = upstreamSha;
     const errorMessage = error?.includes('API key not configured')
         ? 'Please set pullerBear.apiKey in VS Code settings to enable AI summaries.'
@@ -197,26 +208,31 @@ export function createFallbackSummary(head: any, behindCount: number, upstreamSh
 
     const remoteName = head?.upstream?.remote ?? 'origin';
     const branchName = head?.upstream?.name ?? 'main';
-
+    
     return {
-        hash: dedupKey,
-        message: `${behindCount} new commit(s) on ` + `${remoteName}/${branchName}`,
-        summary: `You are ${behindCount} commit(s) behind. ${errorMessage}`,
-        timestamp: Date.now()
+        hash        : dedupKey,
+        message     : `${behindCount} new commit(s) on ` + `${remoteName}/${branchName}`,
+        summary     : `You are ${behindCount} commit(s) behind. ${errorMessage}`,
+        timestamp   : Date.now()
     };
 }
 
 /**
  * Normalizes the Git API diff payload into plain text for AI input.
  */
-export function normalizeDiffPayload(rawDiff: unknown): string {
-    if (typeof rawDiff === 'string') {
+export function normalizeDiffPayload(rawDiff: unknown): string
+{
+    if (typeof rawDiff === 'string')
+    {
         return rawDiff;
     }
 
-    if (Array.isArray(rawDiff)) {
-        const entries = rawDiff.map((item: any, index: number) => {
-            if (typeof item === 'string') {
+    if (Array.isArray(rawDiff))
+    {
+        const entries = rawDiff.map((item: any, index: number) =>
+        {
+            if (typeof item === 'string')
+            {
                 return item;
             }
 
@@ -233,11 +249,14 @@ export function normalizeDiffPayload(rawDiff: unknown): string {
         return entries.join('\n');
     }
 
-    if (rawDiff && typeof rawDiff === 'object') {
-        try {
+    if (rawDiff && typeof rawDiff === 'object')
+    {
+        try
+        {
             return JSON.stringify(rawDiff, null, 2);
         }
-        catch {
+        catch
+        {
             return '';
         }
     }
@@ -247,13 +266,16 @@ export function normalizeDiffPayload(rawDiff: unknown): string {
 /**
  * Fallback path to obtain a real unified patch directly from git CLI.
  */
-export async function getDiffFromGitCli(repository: any, range: string): Promise<string> {
+export async function getDiffFromGitCli(repository: any, range: string): Promise<string>
+{
     const cwd = repository?.rootUri?.fsPath;
-    if (!cwd || typeof cwd !== 'string') {
+    if (!cwd || typeof cwd !== 'string')
+    {
         return '';
     }
 
-    try {
+    try
+    {
         const { stdout } = await execFileAsync(
             'git',
             ['diff', '--no-color', '--patch', range],
@@ -262,7 +284,8 @@ export async function getDiffFromGitCli(repository: any, range: string): Promise
 
         return typeof stdout === 'string' ? stdout : '';
     }
-    catch (error) {
+    catch (error)
+    {
         console.warn('[PullerBear] git diff fallback failed:', error);
         return '';
     }
@@ -277,16 +300,20 @@ export async function runAIAnalysis(
     targetRef: string,
     targetSha: string,
     behindCount: number
-): Promise<CommitSummary | null> {
-    try {
+): Promise<CommitSummary | null>
+{
+    try
+    {
         // Compare HEAD with configured target branch to get incoming changes
         const range = `HEAD...${targetRef}`;
 
         let rawDiff: unknown;
-        if (typeof repository.diffWith === 'function') {
+        if (typeof repository.diffWith === 'function')
+        {
             rawDiff = await repository.diffWith(range);
         }
-        else {
+        else
+        {
             rawDiff = await repository.diff(range);
         }
 
@@ -295,25 +322,21 @@ export async function runAIAnalysis(
         const cliDiffText = looksLikePatch ? '' : await getDiffFromGitCli(repository, range);
         const diffText = cliDiffText || apiDiffText;
         const analysis = await analyzeCode({
-            branchName: head.name ?? 'unknown',
+            branchName : head.name ?? 'unknown',
             diffText
         });
 
         // Extract AI summary text from OpenRouter response
-        let summaryText: string = "AI summary unavailable.";
-        try {
-            const parsedAnalysis = JSON.parse(analysis);
-            summaryText = parseAIResponse(parsedAnalysis);
-        } catch (parseError) {
-            console.error('[PullerBear] Failed to parse AI response:', parseError);
-            console.log('[PullerBear] Raw analysis:', analysis);
-        }
+        const summaryText =
+            analysis?.choices?.[0]?.message?.content ??
+            JSON.stringify(analysis);
 
         const summary = createCommitSummary(targetRef, behindCount, summaryText, targetSha);
         writeToFile(summary);
         return summary;
     }
-    catch (aiError) {
+    catch (aiError)
+    {
         console.error('[PullerBear] AI analysis failed:', aiError);
         const errorMessage = aiError instanceof Error ? aiError.message : String(aiError);
         return createFallbackSummary(head, behindCount, targetSha, errorMessage);
@@ -326,7 +349,8 @@ export async function runAIAnalysis(
 export function exceedsHardStopThreshold(
     commitsInWindow: number,
     config: GitMonitorConfig
-): boolean {
+): boolean
+{
     return commitsInWindow >= config.hardStopCommitThreshold;
 }
 
@@ -336,7 +360,8 @@ export function exceedsHardStopThreshold(
 export function exceedsWarningThreshold(
     commitsInWindow: number,
     config: GitMonitorConfig
-): boolean {
+): boolean
+{
     return commitsInWindow > config.warningCommitThreshold;
 }
 
@@ -350,150 +375,116 @@ export async function checkRepository(
     isManual: boolean = false
 ): Promise<void>
 {
-    // Use a queue to prevent race conditions between interval and manual checks
-    if (state.checkQueue)
+    if (state.isChecking)
     {
-        // If a check is already queued or running, skip this one
-        // unless it's a manual check, which should wait for the current one to complete
-        if (!isManual)
-        {
-            console.log('[PullerBear] checkRepository skipped: check already queued');
-            return;
-        }
-        // For manual checks, wait for the current check to finish then run
-        await state.checkQueue;
+        console.log('[PullerBear] checkRepository skipped: already checking');
+        return;
     }
 
-    const runCheck = async (): Promise<void> =>
+    state.isChecking = true;
+
+    try
     {
-        try
+        const config = getPullerBearConfig();
+        const windowMs = config.commitWindowMinutes * 60 * 1000;
+
+        // Fetch all branches from all remotes
+        await repository.fetch();
+        console.log('[PullerBear] Fetched latest from remote.');
+
+        const head = repository.state?.HEAD;
+
+        const targetRef = resolveTargetBranchRef(head, config.branchRef);
+        const isUpstreamTarget = isCurrentUpstreamTarget(head, targetRef);
+
+        if (!isUpstreamTarget && isManual)
         {
-            if (state.isChecking)
-            {
-                console.log('[PullerBear] checkRepository skipped: already checking');
-                return;
-            }
+            showConfiguredBranchChangesMessage(targetRef);
+        }
 
-            state.isChecking = true;
+        const targetSha = await getTargetCommitHash(repository, targetRef);
+        const dedupKey = targetSha;
 
-            const config = getPullerBearConfig();
-            const windowMs = config.commitWindowMinutes * 60 * 1000;
-
-            // Fetch all branches from all remotes
-            try
+        if (provider.hasSummary(dedupKey))
+        {
+            console.log(`[PullerBear] checkRepository skipped: dedup hit for ${dedupKey}`);
+            if (isManual)
             {
-                await repository.fetch();
-                console.log('[PullerBear] Fetched latest from remote.');
-            }
-            catch (fetchError)
-            {
-                console.error('[PullerBear] Fetch failed:', fetchError);
-                vscode.window.showWarningMessage(
-                    '🐻‍❄️ PullerBear: Failed to fetch from remote. Check your network connection.'
+                vscode.window.showInformationMessage(
+                    '🐻‍❄️ PullerBear: No new commits to summarize.'
                 );
-                state.isChecking = false;
-                return;
             }
-
-            const head = repository.state?.HEAD;
-
-            const targetRef = resolveTargetBranchRef(head, config.branchRef);
-            const isUpstreamTarget = isCurrentUpstreamTarget(head, targetRef);
-
-            if (!isUpstreamTarget && isManual)
-            {
-                showConfiguredBranchChangesMessage(targetRef);
-            }
-
-            const targetSha = await getTargetCommitHash(repository, targetRef);
-            const dedupKey = targetSha;
-
-            if (provider.hasSummary(dedupKey))
-            {
-                console.log(`[PullerBear] checkRepository skipped: dedup hit for ${dedupKey}`);
-                if (isManual)
-                {
-                    vscode.window.showInformationMessage(
-                        '🐻‍❄️ PullerBear: No new commits to summarize.'
-                    );
-                }
-                return;
-            }
-
-            const currentBehind = isUpstreamTarget ? (head?.behind ?? 0) : 1;
-            const newIncomingCommits = calculateNewCommits(currentBehind, state.lastBehindCount);
-
-            state.lastBehindCount = currentBehind;
-
-            // Add new commit timestamps
-            addNewCommitTimestamps(state, newIncomingCommits);
-
-            // Get commits in window (also prunes old ones)
-            const commitsInWindow = getCommitsInWindow(state.commitTimestamps, windowMs);
-
-            if (isUpstreamTarget && currentBehind <= 0)
-            {
-                console.log('[PullerBear] checkRepository skipped: upstream target not behind');
-                if (isManual)
-                {
-                    vscode.window.showInformationMessage(
-                        '🐻‍❄️ PullerBear: You\'re all caught up! No new commits to summarize.'
-                    );
-                }
-                return;
-            }
-
-            if (exceedsHardStopThreshold(commitsInWindow, config))
-            {
-                console.log('[PullerBear] checkRepository skipped: hard stop threshold exceeded');
-                showHardStopMessage(commitsInWindow, config);
-                return;
-            }
-
-            if (exceedsWarningThreshold(commitsInWindow, config))
-            {
-                const shouldContinue = await showWarningMessage(commitsInWindow, config);
-
-                if (!shouldContinue)
-                {
-                    console.log('[PullerBear] checkRepository skipped: user canceled warning prompt');
-                    return;
-                }
-            }
-
-            const behindCount: number = currentBehind;
-
-            if (isUpstreamTarget)
-            {
-                showRemoteChangesMessage(behindCount);
-            }
-            else
-            {
-                showConfiguredBranchChangesMessage(targetRef);
-            }
-
-            // Run AI analysis and push results to the sidebar
-            console.log(`[PullerBear] Running AI analysis with target ${targetRef} and sha ${targetSha}`);
-            const summary = await runAIAnalysis(repository, head, targetRef, targetSha, behindCount);
-
-            if (summary)
-            {
-                provider.addSummary(summary);
-            }
+            return;
         }
-        catch (error)
+
+        const currentBehind = isUpstreamTarget ? (head?.behind ?? 0) : 1;
+        const newIncomingCommits = calculateNewCommits(currentBehind, state.lastBehindCount);
+
+        state.lastBehindCount = currentBehind;
+
+        // Add new commit timestamps
+        addNewCommitTimestamps(state, newIncomingCommits);
+
+        // Get commits in window (also prunes old ones)
+        const commitsInWindow = getCommitsInWindow(state.commitTimestamps, windowMs);
+
+        if (isUpstreamTarget && currentBehind <= 0)
         {
-            console.error('[PullerBear] Error fetching repository:', error);
-            vscode.window.showErrorMessage('PullerBear: Error fetching repository.');
+            console.log('[PullerBear] checkRepository skipped: upstream target not behind');
+            if (isManual)
+            {
+                vscode.window.showInformationMessage(
+                    '🐻‍❄️ PullerBear: You\'re all caught up! No new commits to summarize.'
+                );
+            }
+            return;
         }
-        finally
-        {
-            state.isChecking = false;
-        }
-    };
 
-    // Store the promise in the queue
-    state.checkQueue = runCheck();
-    await state.checkQueue;
-    state.checkQueue = undefined;
+        if (exceedsHardStopThreshold(commitsInWindow, config))
+        {
+            console.log('[PullerBear] checkRepository skipped: hard stop threshold exceeded');
+            showHardStopMessage(commitsInWindow, config);
+            return;
+        }
+
+        if (exceedsWarningThreshold(commitsInWindow, config))
+        {
+            const shouldContinue = await showWarningMessage(commitsInWindow, config);
+
+            if (!shouldContinue)
+            {
+                console.log('[PullerBear] checkRepository skipped: user canceled warning prompt');
+                return;
+            }
+        }
+
+        const behindCount: number = currentBehind;
+
+        if (isUpstreamTarget)
+        {
+            showRemoteChangesMessage(behindCount);
+        }
+        else
+        {
+            showConfiguredBranchChangesMessage(targetRef);
+        }
+
+        // Run AI analysis and push results to the sidebar
+        console.log(`[PullerBear] Running AI analysis with target ${targetRef} and sha ${targetSha}`);
+        const summary = await runAIAnalysis(repository, head, targetRef, targetSha, behindCount);
+
+        if (summary)
+        {
+            provider.addSummary(summary);
+        }
+    }
+    catch (error)
+    {
+        console.error('[PullerBear] Error fetching repository:', error);
+        vscode.window.showErrorMessage('PullerBear: Error fetching repository.');
+    }
+    finally
+    {
+        state.isChecking = false;
+    }
 }
