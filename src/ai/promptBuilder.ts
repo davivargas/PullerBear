@@ -9,7 +9,7 @@ export function buildPrompt(context: diffContext): { role: string; content: stri
             role: 'system',
             content: getSystemPrompt()
         },
-        {   
+        {
             role: 'user',
             content: `Analyze the following changes in branch ${context.branchName} and provide a summary of the changes, their purpose, and any potential impacts:\n\n${context.diffText}`
         }

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { ExplainerViewProvider } from '../ExplainerViewProvider';
 import { getPullerBearConfig } from '../config/pullerBearConfig';
 import { RepoMonitorState } from './types';
-import { createRepoState, createRepoStateMap, isRepositoryMonitored, setMonitorInterval, clearMonitorInterval } from './gitState';
+import { createRepoState, createRepoStateMap, isRepositoryMonitored, clearMonitorInterval } from './gitState';
 import { checkRepository } from './repositoryChecker';
 import { clearReviewFile } from '../utl/fileWrite';
 
@@ -131,7 +131,7 @@ function initializeRepositoryMonitor(
 export function gitMonitor(
     context: vscode.ExtensionContext,
     provider: ExplainerViewProvider
-): void
+): () => Promise<void>
 {
     const gitExtension = vscode.extensions.getExtension('vscode.git');
 
@@ -141,18 +141,20 @@ export function gitMonitor(
         vscode.window.showErrorMessage(
             'Git extension not found. Please install the Git extension to use PullerBear.'
         );
-        return;
+        return async () => Promise.resolve();
     }
 
     // Get the Git API
     const git = gitExtension.exports.getAPI(1);
     const repoStates = createRepoStateMap();
+    const repositories = new Set<any>();
 
     const initRepo = (repository: any) => {
         if (isRepositoryMonitored(repoStates, repository))
         {
             return;
         }
+        repositories.add(repository);
         initializeRepositoryMonitor(repository, repoStates, provider, context);
     };
 
@@ -167,4 +169,18 @@ export function gitMonitor(
     {
         initRepo(repo);
     }
+
+    return async (): Promise<void> =>
+    {
+        for (const repository of repositories)
+        {
+            const state = repoStates.get(repository);
+            if (!state)
+            {
+                continue;
+            }
+
+            await checkRepository(repository, state, provider, true);
+        }
+    };
 }

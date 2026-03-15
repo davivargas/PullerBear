@@ -22,6 +22,7 @@ const vscode = acquireVsCodeApi();
 
 export function App() {
     const [summaries, setSummaries] = useState<CommitSummary[]>([]);
+    const [isReloadHovered, setIsReloadHovered] = useState(false);
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -75,6 +76,25 @@ export function App() {
                         <span style={styles.bear}>🐻‍❄️</span>
                         <h1 style={styles.title}>What's New</h1>
                     </div>
+                    <button
+                        type="button"
+                        style={{
+                            ...styles.reloadButton,
+                            border: isReloadHovered
+                                ? '1px solid var(--vscode-panel-border)'
+                                : '1px solid transparent'
+                        }}
+                        onMouseEnter={() => setIsReloadHovered(true)}
+                        onMouseLeave={() => setIsReloadHovered(false)}
+                        onClick={() => vscode.postMessage({ type: 'refresh' })}
+                        title="Refresh commits"
+                        aria-label="Refresh commits"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                            <polyline points="21 3 21 9 15 9" />
+                        </svg>
+                    </button>
                 </header>
 
                 {summaries.length === 0 ? (
@@ -222,6 +242,19 @@ const styles: Record<string, React.CSSProperties> = {
         fontSize: '14px',
         fontWeight: 600,
         color: 'var(--vscode-foreground)',
+    },
+    reloadButton: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '24px',
+        height: '24px',
+        padding: 0,
+        border: '1px solid transparent',
+        borderRadius: '4px',
+        background: 'transparent',
+        color: 'var(--vscode-foreground)',
+        cursor: 'pointer',
     },
     empty: {
         color: 'var(--vscode-descriptionForeground)',

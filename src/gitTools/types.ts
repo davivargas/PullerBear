@@ -1,6 +1,3 @@
-import * as vscode from 'vscode';
-import { ExplainerViewProvider, CommitSummary } from '../ExplainerViewProvider';
-
 export interface RepoMonitorState
 {
     commitTimestamps : number[];
@@ -32,8 +29,3 @@ export interface CheckResult
     behindCount    : number;
     newCommits     : number;
 }
-
-// Re-exports removed - import directly from source modules
-// Import CommitSummary from '../ExplainerViewProvider'
-// Import ExplainerViewProvider from '../ExplainerViewProvider'
-// Import vscode from 'vscode'
