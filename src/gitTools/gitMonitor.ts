@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
-import { analyzeCode } from '../ai/aiClient';
-import { ExplainerViewProvider, CommitSummary } from '../ExplainerViewProvider';
+import { ExplainerViewProvider } from '../ExplainerViewProvider';
 import { getPullerBearConfig } from '../config/pullerBearConfig';
 import { RepoMonitorState } from './types';
 import { createRepoState, createRepoStateMap, isRepositoryMonitored, setMonitorInterval, clearMonitorInterval } from './gitState';
@@ -84,15 +83,17 @@ function initializeRepositoryMonitor(
 export function gitMonitor(
     context: vscode.ExtensionContext,
     provider: ExplainerViewProvider
-) {
+): void
+{
     const gitExtension = vscode.extensions.getExtension('vscode.git');
 
     // Check if the Git extension is available
-    if (!gitExtension) {
+    if (!gitExtension)
+    {
         vscode.window.showErrorMessage(
             'Git extension not found. Please install the Git extension to use PullerBear.'
         );
-        return { refresh: () => {} };
+        return;
     }
 
     // Get the Git API
