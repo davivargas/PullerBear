@@ -94,7 +94,7 @@ function initializeRepositoryMonitor(
     let configTimeout: NodeJS.Timeout | undefined;
     const configChangeDisposable = vscode.workspace.onDidChangeConfiguration((event) =>
     {
-        if (event.affectsConfiguration('pullerbear'))
+        if (event.affectsConfiguration('pullerBear'))
         {
             // Debounce config changes to avoid creating multiple intervals
             if (configTimeout)
