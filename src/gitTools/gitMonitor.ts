@@ -65,13 +65,18 @@ function initializeRepositoryMonitor(
         }
     });
 
-    // Handle repository close
-    const closeDisposable = repository.onDidClose(() =>
+    // Handle repository close (some repository objects don't expose onDidClose)
+    let closeDisposable: vscode.Disposable = { dispose: (): void => undefined };
+
+    if (typeof repository.onDidClose === 'function')
     {
-        clearMonitorInterval(state);
-        configChangeDisposable.dispose();
-        closeDisposable.dispose();
-    });
+        closeDisposable = repository.onDidClose(() =>
+        {
+            clearMonitorInterval(state);
+            configChangeDisposable.dispose();
+            closeDisposable.dispose();
+        });
+    }
 
     context.subscriptions.push(configChangeDisposable, closeDisposable);
 }
