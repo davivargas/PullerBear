@@ -39,6 +39,9 @@ PullerBear is a VS Code extension that watches your Git remote, summarizes incom
 4. When remote commits are detected, read the generated summary cards.
 5. Use the chat box at the bottom to ask questions about the latest reviews.
 
+**Here is a lastest packaged of the extension for you to try out!**
+`C:\Users\tkngu\OneDrive\Documents\Canada\Hackathons\HackTheBreak2026\PullerBear\pullerbear-0.0.1.vsix`
+
 ## Extension settings
 
 Configure in **Settings** (`Ctrl+,`), by searching `PullerBear` in extensions section, or in `settings.json`.
