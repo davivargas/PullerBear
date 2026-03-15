@@ -2,6 +2,10 @@
   "name": "pullerbear",
   "displayName": "PullerBear",
   "description": "An extension that notifies the user to do a git pull when they first open the project. It will also explain what they just pulled and warn about any potential errors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/davivargas/PullerBear.git"
+  },
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.110.0"
@@ -97,6 +101,7 @@
     "@types/vscode": "^1.110.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.27.3",
     "eslint": "^9.39.3",
     "mocha": "^10.8.2",
