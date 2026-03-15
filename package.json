@@ -2,6 +2,10 @@
   "name": "pullerbear",
   "displayName": "PullerBear",
   "description": "An extension that notifies the user to do a git pull when they first open the project. It will also explain what they just pulled and warn about any potential errors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/davivargas/PullerBear.git"
+  },
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.110.0"
@@ -38,35 +42,40 @@
           "name": "What's New"
         }
       ]
-    }
-  },
-  "configuration": {
-    "title": "PullerBear",
-    "properties": {
-      "pullerBear.apiKey": {
-        "type": "string",
-        "default": "",
-        "description": "OpenRouter API key for AI summarization. Get one at https://openrouter.ai/settings/keys"
-      },
-      "pullerBear.fetchIntervalMinutes": {
-        "type": "number",
-        "default": 1,
-        "description": "How often to check for new commits (in minutes)"
-      },
-      "pullerBear.commitWindowMinutes": {
-        "type": "number",
-        "default": 60,
-        "description": "Time window to track commit frequency (in minutes)"
-      },
-      "pullerBear.warningCommitThreshold": {
-        "type": "number",
-        "default": 2,
-        "description": "Show warning when commits exceed this threshold"
-      },
-      "pullerBear.hardStopCommitThreshold": {
-        "type": "number",
-        "default": 5,
-        "description": "Stop AI summarization when commits exceed this threshold"
+    },
+    "configuration": {
+      "title": "PullerBear",
+      "properties": {
+        "pullerBear.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenRouter API key for AI summarization. Get one at https://openrouter.ai/settings/keys"
+        },
+        "pullerBear.fetchIntervalMinutes": {
+          "type": "number",
+          "default": 10,
+          "description": "How often to check for new commits (in minutes)"
+        },
+        "pullerBear.commitWindowMinutes": {
+          "type": "number",
+          "default": 60,
+          "description": "Time window to track commit frequency (in minutes)"
+        },
+        "pullerBear.warningCommitThreshold": {
+          "type": "number",
+          "default": 2,
+          "description": "Show warning when commits exceed this threshold"
+        },
+        "pullerBear.hardStopCommitThreshold": {
+          "type": "number",
+          "default": 5,
+          "description": "Stop AI summarization when commits exceed this threshold"
+        },
+        "pullerBear.branchRef": {
+          "type": "string",
+          "default": "main",
+          "description": "Remote branch target to compare against (e.g., upstream, main)"
+        }
       }
     }
   },
@@ -92,6 +101,7 @@
     "@types/vscode": "^1.110.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.27.3",
     "eslint": "^9.39.3",
     "mocha": "^10.8.2",

@@ -172,11 +172,14 @@ export function createCommitSummary(
 ): CommitSummary
 {
     const dedupKey = targetSha;
+    const [remoteName, ...branchParts] = targetRef.split('/');
+    const branchName = branchParts.join('/');
+
     return createCommitSummaryObject(
         dedupKey,
         behindCount,
-        targetRef,
-        '',
+        remoteName || 'origin',
+        branchName || 'main',
         summaryText
     );
 }
@@ -207,12 +210,13 @@ export function createFallbackSummary(head: any, behindCount: number, upstreamSh
         ? 'Please set pullerBear.apiKey in VS Code settings to enable AI summaries.'
         : 'AI summary unavailable.';
 
-    const remoteName = head?.upstream?.remote ?? 'origin';
-    const branchName = head?.upstream?.name ?? 'main';
+    const targetRef = resolveTargetBranchRef(head, getPullerBearConfig().branchRef);
+    const [remoteName, ...branchParts] = targetRef.split('/');
+    const branchName = branchParts.join('/') || 'main';
     
     return {
         hash        : dedupKey,
-        message     : `${behindCount} new commit(s) on ` + `${remoteName}/${branchName}`,
+        message     : `${behindCount} new commit(s) on ` + `${remoteName || 'origin'}/${branchName}`,
         summary     : `You are ${behindCount} commit(s) behind. ${errorMessage}`,
         timestamp   : Date.now()
     };
