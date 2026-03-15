@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { analyzeCode } from '../ai/aiClient';
 import { ExplainerViewProvider, CommitSummary } from '../ExplainerViewProvider';
 import { getPullerBearConfig } from '../config/pullerBearConfig';
@@ -10,6 +12,8 @@ import {
     getCommitsInWindow
 } from './commitTracker';
 import { writeToFile } from '../utl/fileWrite';
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Checks if the repository has an upstream branch configured
@@ -83,25 +87,75 @@ export function showRemoteChangesMessage(behindCount: number): void
 }
 
 /**
+ * Shows message for configured non-upstream branch updates.
+ */
+export function showConfiguredBranchChangesMessage(targetRef: string): void
+{
+    vscode.window.showInformationMessage(
+        `🐻‍❄️ PullerBear: Remote changes detected on ${targetRef}.`
+    );
+}
+
+/**
+ * Resolves configured target branch ref for comparison.
+ */
+export function resolveTargetBranchRef(head: any, branchRef: string): string
+{
+    const configuredRef = branchRef.trim();
+    if (!configuredRef || configuredRef.toLowerCase() === 'upstream')
+    {
+        if (head?.upstream?.remote && head?.upstream?.name)
+        {
+            return `${head.upstream.remote}/${head.upstream.name}`;
+        }
+
+        return 'origin/main';
+    }
+
+    if (configuredRef.includes('/'))
+    {
+        return configuredRef;
+    }
+
+    const remoteName = head?.upstream?.remote ?? 'origin';
+    return `${remoteName}/${configuredRef}`;
+}
+
+/**
+ * Checks whether target ref is the current branch's tracked upstream.
+ */
+export function isCurrentUpstreamTarget(head: any, targetRef: string): boolean
+{
+    if (!hasUpstreamBranch(head))
+    {
+        return false;
+    }
+
+    const upstreamRef = `${head.upstream.remote}/${head.upstream.name}`;
+    return upstreamRef === targetRef;
+}
+
+/**
  * Looks up the upstream HEAD commit SHA from repository refs.
  */
-export async function getUpstreamCommitHash(repository: any, head: any): Promise<string> {
-    const upstreamRef = `${head.upstream.remote}/${head.upstream.name}`;
+export async function getTargetCommitHash(repository: any, targetRef: string): Promise<string> {
     
     try {
-        const branch = await repository.getBranch(upstreamRef);
+        const branch = await repository.getBranch(targetRef);
         if (branch && branch.commit) {
             return branch.commit;
         }
     } catch (e) {
-        console.warn(`[PullerBear] Failed to get branch for ${upstreamRef}:`, e);
+        console.warn(`[PullerBear] Failed to get branch for ${targetRef}:`, e);
     }
 
     const refs: any[] = repository.state?.refs ?? [];
-    const match = refs.find((r: any) => 
-        r.name === upstreamRef || 
-        r.name === `refs/remotes/${upstreamRef}` || 
-        (r.remote === head.upstream.remote && r.name === head.upstream.name)
+    const [remoteName, ...branchParts] = targetRef.split('/');
+    const branchName = branchParts.join('/');
+    const match = refs.find((r: any) =>
+        r.name === targetRef ||
+        r.name === `refs/remotes/${targetRef}` ||
+        (r.remote === remoteName && r.name === branchName)
     );
     return match?.commit ?? 'unknown';
 }
@@ -110,18 +164,18 @@ export async function getUpstreamCommitHash(repository: any, head: any): Promise
  * Creates a commit summary from the analysis results
  */
 export function createCommitSummary(
-    head: any,
+    targetRef: string,
     behindCount: number,
     summaryText: string,
-    upstreamSha: string
+    targetSha: string
 ): CommitSummary
 {
-    const dedupKey = upstreamSha;
+    const dedupKey = targetSha;
     return createCommitSummaryObject(
         dedupKey,
         behindCount,
-        head.upstream.remote,
-        head.upstream.name,
+        targetRef,
+        '',
         summaryText
     );
 }
@@ -151,33 +205,125 @@ export function createFallbackSummary(head: any, behindCount: number, upstreamSh
     const errorMessage = error?.includes('API key not configured')
         ? 'Please set pullerBear.apiKey in VS Code settings to enable AI summaries.'
         : 'AI summary unavailable.';
+
+    const remoteName = head?.upstream?.remote ?? 'origin';
+    const branchName = head?.upstream?.name ?? 'main';
     
     return {
         hash        : dedupKey,
-        message     : `${behindCount} new commit(s) on ` +
-                      `${head.upstream.remote}/${head.upstream.name}`,
+        message     : `${behindCount} new commit(s) on ` + `${remoteName}/${branchName}`,
         summary     : `You are ${behindCount} commit(s) behind. ${errorMessage}`,
         timestamp   : Date.now()
     };
 }
 
 /**
- * Runs AI analysis on the repository diff
+ * Normalizes the Git API diff payload into plain text for AI input.
  */
+export function normalizeDiffPayload(rawDiff: unknown): string
+{
+    if (typeof rawDiff === 'string')
+    {
+        return rawDiff;
+    }
+
+    if (Array.isArray(rawDiff))
+    {
+        const entries = rawDiff.map((item: any, index: number) =>
+        {
+            if (typeof item === 'string')
+            {
+                return item;
+            }
+
+            const uri = item?.uri?.fsPath ?? item?.uri?.path ?? 'unknown';
+            const originalUri = item?.originalUri?.fsPath ?? item?.originalUri?.path;
+            const status = item?.status ?? 'unknown';
+            const renameInfo = originalUri && originalUri !== uri
+                ? ` (from ${originalUri})`
+                : '';
+
+            return `- [${index + 1}] status=${status} file=${uri}${renameInfo}`;
+        });
+
+        return entries.join('\n');
+    }
+
+    if (rawDiff && typeof rawDiff === 'object')
+    {
+        try
+        {
+            return JSON.stringify(rawDiff, null, 2);
+        }
+        catch
+        {
+            return '';
+        }
+    }
+    return '';
+}
+
+/**
+ * Fallback path to obtain a real unified patch directly from git CLI.
+ */
+export async function getDiffFromGitCli(repository: any, range: string): Promise<string>
+{
+    const cwd = repository?.rootUri?.fsPath;
+    if (!cwd || typeof cwd !== 'string')
+    {
+        return '';
+    }
+
+    try
+    {
+        const { stdout } = await execFileAsync(
+            'git',
+            ['diff', '--no-color', '--patch', range],
+            { cwd, maxBuffer: 10 * 1024 * 1024 }
+        );
+
+        return typeof stdout === 'string' ? stdout : '';
+    }
+    catch (error)
+    {
+        console.warn('[PullerBear] git diff fallback failed:', error);
+        return '';
+    }
+}
+
+/*
+ * Runs AI analysis on the repository diff
+*/
 export async function runAIAnalysis(
     repository: any,
     head: any,
-    upstreamSha: string
+    targetRef: string,
+    targetSha: string,
+    behindCount: number
 ): Promise<CommitSummary | null>
 {
     try
     {
-        // Compare HEAD with upstream branch to get incoming changes
-        const upstreamRef = `${head.upstream.remote}/${head.upstream.name}`;
-        const diffText = await repository.diff(`${upstreamRef}...HEAD`);
+        // Compare HEAD with configured target branch to get incoming changes
+        const range = `HEAD...${targetRef}`;
+
+        let rawDiff: unknown;
+        if (typeof repository.diffWith === 'function')
+        {
+            rawDiff = await repository.diffWith(range);
+        }
+        else
+        {
+            rawDiff = await repository.diff(range);
+        }
+
+        const apiDiffText = normalizeDiffPayload(rawDiff);
+        const looksLikePatch = apiDiffText.includes('diff --git') || apiDiffText.includes('@@');
+        const cliDiffText = looksLikePatch ? '' : await getDiffFromGitCli(repository, range);
+        const diffText = cliDiffText || apiDiffText;
         const analysis = await analyzeCode({
             branchName : head.name ?? 'unknown',
-            diffText   : typeof diffText === 'string' ? diffText : ''
+            diffText
         });
 
         // Extract AI summary text from OpenRouter response
@@ -185,8 +331,7 @@ export async function runAIAnalysis(
             analysis?.choices?.[0]?.message?.content ??
             JSON.stringify(analysis);
 
-        const behindCount = head.behind ?? 0;
-        const summary =  createCommitSummary(head, behindCount, summaryText, upstreamSha);
+        const summary = createCommitSummary(targetRef, behindCount, summaryText, targetSha);
         writeToFile(summary);
         return summary;
     }
@@ -194,8 +339,7 @@ export async function runAIAnalysis(
     {
         console.error('[PullerBear] AI analysis failed:', aiError);
         const errorMessage = aiError instanceof Error ? aiError.message : String(aiError);
-        const behindCount = head.behind ?? 0;
-        return createFallbackSummary(head, behindCount, upstreamSha, errorMessage);
+        return createFallbackSummary(head, behindCount, targetSha, errorMessage);
     }
 }
 
@@ -233,6 +377,7 @@ export async function checkRepository(
 {
     if (state.isChecking)
     {
+        console.log('[PullerBear] checkRepository skipped: already checking');
         return;
     }
 
@@ -249,15 +394,30 @@ export async function checkRepository(
 
         const head = repository.state?.HEAD;
 
-        // If the branch has no upstream, warn and exit
-        if (!hasUpstreamBranch(head))
+        const targetRef = resolveTargetBranchRef(head, config.branchRef);
+        const isUpstreamTarget = isCurrentUpstreamTarget(head, targetRef);
+
+        if (!isUpstreamTarget && isManual)
         {
-            console.log('[PullerBear] No upstream branch set.');
-            showNoUpstreamMessage();
+            showConfiguredBranchChangesMessage(targetRef);
+        }
+
+        const targetSha = await getTargetCommitHash(repository, targetRef);
+        const dedupKey = targetSha;
+
+        if (provider.hasSummary(dedupKey))
+        {
+            console.log(`[PullerBear] checkRepository skipped: dedup hit for ${dedupKey}`);
+            if (isManual)
+            {
+                vscode.window.showInformationMessage(
+                    '🐻‍❄️ PullerBear: No new commits to summarize.'
+                );
+            }
             return;
         }
 
-        const currentBehind = head.behind ?? 0;
+        const currentBehind = isUpstreamTarget ? (head?.behind ?? 0) : 1;
         const newIncomingCommits = calculateNewCommits(currentBehind, state.lastBehindCount);
 
         state.lastBehindCount = currentBehind;
@@ -268,9 +428,11 @@ export async function checkRepository(
         // Get commits in window (also prunes old ones)
         const commitsInWindow = getCommitsInWindow(state.commitTimestamps, windowMs);
 
-        if (currentBehind <= 0)
+        if (isUpstreamTarget && currentBehind <= 0)
         {
-            if (isManual) {
+            console.log('[PullerBear] checkRepository skipped: upstream target not behind');
+            if (isManual)
+            {
                 vscode.window.showInformationMessage(
                     '🐻‍❄️ PullerBear: You\'re all caught up! No new commits to summarize.'
                 );
@@ -280,6 +442,7 @@ export async function checkRepository(
 
         if (exceedsHardStopThreshold(commitsInWindow, config))
         {
+            console.log('[PullerBear] checkRepository skipped: hard stop threshold exceeded');
             showHardStopMessage(commitsInWindow, config);
             return;
         }
@@ -290,30 +453,25 @@ export async function checkRepository(
 
             if (!shouldContinue)
             {
+                console.log('[PullerBear] checkRepository skipped: user canceled warning prompt');
                 return;
             }
         }
 
-        // Look up the real upstream commit SHA for dedup + display
-        const upstreamSha = await getUpstreamCommitHash(repository, head);
-        const dedupKey = upstreamSha;
-
-        // Skip AI analysis if we already have a summary for this upstream state
-        if (provider.hasSummary(dedupKey)) {
-            if (isManual) {
-                vscode.window.showInformationMessage(
-                    '🐻‍❄️ PullerBear: No new commits to summarize.'
-                );
-            }
-            return;
-        }
-
         const behindCount: number = currentBehind;
 
-        showRemoteChangesMessage(behindCount);
+        if (isUpstreamTarget)
+        {
+            showRemoteChangesMessage(behindCount);
+        }
+        else
+        {
+            showConfiguredBranchChangesMessage(targetRef);
+        }
 
         // Run AI analysis and push results to the sidebar
-        const summary = await runAIAnalysis(repository, head, upstreamSha);
+        console.log(`[PullerBear] Running AI analysis with target ${targetRef} and sha ${targetSha}`);
+        const summary = await runAIAnalysis(repository, head, targetRef, targetSha, behindCount);
 
         if (summary)
         {
