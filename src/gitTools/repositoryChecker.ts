@@ -10,6 +10,7 @@ import {
     getCommitsInWindow
 } from './commitTracker';
 import { writeToFile } from '../utl/fileWrite';
+import { detectDefaultBranch, getBranchBehindCount, getConfiguredBranchBehindCount } from './gitState';
 
 /**
  * Checks if the repository has an upstream branch configured
@@ -209,22 +210,23 @@ export async function checkRepository(
     {
         const config = getPullerBearConfig();
         const windowMs = config.commitWindowMinutes * 60 * 1000;
+        const branchRef = config.branchRef || 'main';
 
         // Fetch all branches from all remotes
         await repository.fetch();
         console.log('[PullerBear] Fetched latest from remote.');
 
-        const head = repository.state?.HEAD;
+        // Use the configured branchRef to determine behind count
+        const currentBehind = getConfiguredBranchBehindCount(repository);
 
-        // If the branch has no upstream, warn and exit
-        if (!hasUpstreamBranch(head))
+        // If not behind the configured branch, notify and exit
+        if (currentBehind <= 0)
         {
-            console.log('[PullerBear] No upstream branch set.');
-            showNoUpstreamMessage();
+            // Explicitly notify the user that they are up to date
+            showUpToDateMessage();
             return;
         }
 
-        const currentBehind = head.behind ?? 0;
         const newIncomingCommits = calculateNewCommits(currentBehind, state.lastBehindCount);
 
         state.lastBehindCount = currentBehind;
@@ -234,13 +236,6 @@ export async function checkRepository(
 
         // Get commits in window (also prunes old ones)
         const commitsInWindow = getCommitsInWindow(state.commitTimestamps, windowMs);
-
-        if (currentBehind <= 0)
-        {
-            // Explicitly notify the user that they are up to date
-            showUpToDateMessage();
-            return;
-        }
 
         if (exceedsHardStopThreshold(commitsInWindow, config))
         {
@@ -261,6 +256,17 @@ export async function checkRepository(
         const behindCount: number = currentBehind;
 
         showRemoteChangesMessage(behindCount);
+
+        // Create a mock head object for runAIAnalysis that uses branchRef
+        const head = {
+            commit: repository.state?.HEAD?.commit ?? 'unknown',
+            name: branchRef,
+            upstream: {
+                remote: 'origin',
+                name: branchRef
+            },
+            behind: behindCount
+        };
 
         // Run AI analysis and push results to the sidebar
         const summary = await runAIAnalysis(repository, head);
