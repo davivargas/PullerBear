@@ -170,12 +170,14 @@ export function createCommitSummary(
     targetSha: string
 ): CommitSummary
 {
+    const [remoteName, ...branchParts] = targetRef.split('/');
+    const branchName = branchParts.join('/');
     const dedupKey = targetSha;
     return createCommitSummaryObject(
         dedupKey,
         behindCount,
-        targetRef,
-        '',
+        remoteName,
+        branchName,
         summaryText
     );
 }
