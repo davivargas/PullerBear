@@ -20,7 +20,7 @@ export async function analyzeCode(context: diffContext): Promise<any> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'minimax/minimax-m2.5',
+      model: 'google/gemini-3.1-flash-lite-preview',
       messages: prompt,
     }),
     signal: AbortSignal.timeout(30000),
