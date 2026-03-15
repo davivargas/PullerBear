@@ -1,10 +1,20 @@
 import * as vscode from 'vscode';
 import { gitMonitor } from './gitTools/gitMonitor';
 import { ExplainerViewProvider } from './ExplainerViewProvider';
+import { getPullerBearConfig } from './config/pullerBearConfig';
 
-export function activate(context: vscode.ExtensionContext): void
-{
+export function activate(context: vscode.ExtensionContext) {
     console.log('[PullerBear] Extension activated.');
+
+    // Check if API key is configured
+    const config = getPullerBearConfig();
+    if (!config.apiKey) {
+        vscode.window.showWarningMessage(
+            '🐻‍❄️ PullerBear: No API key configured. ' +
+            'Please set pullerBear.apiKey in VS Code settings to enable AI summaries. ' +
+            'Get your free API key at https://openrouter.ai/settings/keys'
+        );
+    }
 
     // Register the "What's New" sidebar webview
     const provider = new ExplainerViewProvider(context.extensionUri);
@@ -19,4 +29,4 @@ export function activate(context: vscode.ExtensionContext): void
     gitMonitor(context, provider);
 }
 
-export function deactivate(): void {}
+export function deactivate() {}

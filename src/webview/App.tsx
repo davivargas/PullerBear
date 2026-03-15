@@ -25,7 +25,7 @@ export function App() {
         const handler = (event: MessageEvent) => {
             const msg = event.data;
             if (msg.type === 'summaries') {
-                setSummaries(msg.data as CommitSummary[]);
+                setSummaries(msg.data);
             }
         };
         window.addEventListener('message', handler);
@@ -34,34 +34,47 @@ export function App() {
 
     return (
         <div style={styles.container}>
-            <header style={styles.header}>
-                <span style={styles.bear}>🐻‍❄️</span>
-                <h1 style={styles.title}>What's New</h1>
-            </header>
+            <div style={styles.content}>
+                <header style={styles.header}>
+                    <div style={styles.headerLeft}>
+                        <span style={styles.bear}>🐻‍❄️</span>
+                        <h1 style={styles.title}>What's New</h1>
+                    </div>
+                </header>
 
-            {summaries.length === 0 ? (
-                <div style={styles.empty}>
-                    <p>All caught up! PullerBear will notify you when new commits arrive.</p>
-                </div>
-            ) : (
-                <ul style={styles.list}>
-                    {summaries.map((s, index) => (
-                        <li key={`${s.hash}-${s.timestamp}-${index}`} style={styles.card}>
-                            <div style={styles.cardHeader}>
-                                <code style={styles.hash}>{s.hash.slice(0, 7)}</code>
-                                <span style={styles.date}>
-                                    {new Date(s.timestamp).toLocaleString()}
-                                </span>
-                            </div>
-                            <p style={styles.commitMsg}>{s.message}</p>
-                            <div
-                                style={styles.summary}
-                                dangerouslySetInnerHTML={{ __html: markdownToHtml(s.summary) }}
-                            />
-                        </li>
-                    ))}
-                </ul>
-            )}
+                {summaries.length === 0 ? (
+                    <div style={styles.empty}>
+                        <p>All caught up! PullerBear will notify you when new commits arrive.</p>
+                    </div>
+                ) : (
+                    <ul style={styles.list}>
+                        {summaries.map((s) => (
+                            <li key={s.hash} style={styles.card}>
+                                <div style={styles.cardHeader}>
+                                    <code style={styles.hash}>{s.hash.slice(0, 7)}</code>
+                                    <span style={styles.date}>
+                                        {new Date(s.timestamp).toLocaleString()}
+                                    </span>
+                                </div>
+                                <p style={styles.commitMsg}>{s.message}</p>
+                                <div
+                                    style={styles.summary}
+                                    dangerouslySetInnerHTML={{ __html: markdownToHtml(s.summary) }}
+                                />
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+
+            <div style={styles.inputContainer}>
+                <input
+                    type="text"
+                    placeholder="Ask a question about the commits"
+                    style={styles.input}
+                />
+                <button style={styles.button}>Send</button>
+            </div>
         </div>
     );
 }
@@ -84,18 +97,32 @@ const styles: Record<string, React.CSSProperties> = {
     container: {
         fontFamily: 'var(--vscode-font-family)',
         color: 'var(--vscode-foreground)',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        boxSizing: 'border-box',
+    },
+    content: {
+        flex: 1,
+        overflowY: 'auto',
         padding: '12px',
     },
     header: {
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
+        justifyContent: 'space-between',
         marginBottom: '16px',
         borderBottom: '1px solid var(--vscode-panel-border)',
         paddingBottom: '8px',
     },
+    headerLeft: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+    },
     bear: {
         fontSize: '20px',
+        lineHeight: 1,
     },
     title: {
         margin: 0,
@@ -142,10 +169,44 @@ const styles: Record<string, React.CSSProperties> = {
         margin: '4px 0 8px',
         fontSize: '12px',
         fontWeight: 600,
+        overflow: 'hidden',
+        display: '-webkit-box',
+        WebkitBoxOrient: 'vertical',
+        WebkitLineClamp: 3,
+        textOverflow: 'ellipsis',
     },
     summary: {
         fontSize: '12px',
         color: 'var(--vscode-descriptionForeground)',
         lineHeight: 1.6,
     },
+    inputContainer: {
+        padding: '12px',
+        borderTop: '1px solid var(--vscode-panel-border)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        background: 'var(--vscode-sideBar-background)',
+    },
+    input: {
+        background: 'var(--vscode-input-background)',
+        color: 'var(--vscode-input-foreground)',
+        border: '1px solid var(--vscode-input-border)',
+        padding: '6px 8px',
+        fontSize: '12px',
+        fontFamily: 'inherit',
+        borderRadius: '2px',
+        outline: 'none',
+    },
+    button: {
+        background: 'var(--vscode-button-background)',
+        color: 'var(--vscode-button-foreground)',
+        border: 'none',
+        padding: '6px 12px',
+        fontSize: '12px',
+        cursor: 'pointer',
+        borderRadius: '2px',
+        fontWeight: 600,
+    }
 };
+
