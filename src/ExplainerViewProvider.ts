@@ -12,8 +12,13 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
 
     private _view?: vscode.WebviewView;
     private _summaries: CommitSummary[] = [];
+    private _refreshHandler?: () => Promise<void>;
 
     constructor(private readonly _extensionUri: vscode.Uri) {}
+
+    public setRefreshHandler(handler: () => Promise<void>): void {
+        this._refreshHandler = handler;
+    }
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -34,6 +39,11 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
             if (data.type === 'ready') {
                 // Send current summaries on load
                 this._pushSummaries();
+                return;
+            }
+
+            if (data.type === 'refresh') {
+                void this._refreshHandler?.();
             }
         });
     }
