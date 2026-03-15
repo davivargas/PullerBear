@@ -31,13 +31,7 @@ suite('repositoryChecker runAIAnalysis', () =>
             {
                 assert.equal(context.branchName, 'feature/summary');
                 assert.match(context.diffText, /safe = true/);
-                return {
-                    choices: [
-                        {
-                            message: { content: 'AI review result' }
-                        }
-                    ]
-                };
+                return '[{"file":"src/a.ts","line":0,"severity":"info","summary":"AI review result"}]';
             }) as typeof aiClient.analyzeCode
         );
         const restoreWrite = stubMethod(
@@ -54,7 +48,7 @@ suite('repositoryChecker runAIAnalysis', () =>
             const summary = await runAIAnalysis(repository, head, 'origin/main', 'target-commit', 2);
 
             assert.equal(summary?.hash, 'target-commit');
-            assert.equal(summary?.summary, 'AI review result');
+            assert.match(String(summary?.summary), /AI review result/);
             assert.equal(writes.length, 1);
             assert.equal(writes[0].hash, 'target-commit');
         }
@@ -91,6 +85,52 @@ suite('repositoryChecker runAIAnalysis', () =>
         }
         finally
         {
+            restoreAnalyze();
+        }
+    });
+
+    test('uses normalized API diff text when no patch is available and no git CLI fallback can run', async () =>
+    {
+        const repository = createRepository({
+            rootUri  : undefined,
+            diffWith : async (): Promise<unknown> =>
+                [
+                    {
+                        status : 'M',
+                        uri    : { fsPath: '/tmp/a.ts' }
+                    }
+                ]
+        });
+        const restoreAnalyze = stubMethod(
+            aiClient,
+            'analyzeCode',
+            (async (context) =>
+            {
+                assert.match(context.diffText, /a\.ts/);
+                return '[]';
+            }) as typeof aiClient.analyzeCode
+        );
+        const restoreWrite = stubMethod(
+            fileWrite,
+            'writeToFile',
+            ((_: unknown): void => undefined) as typeof fileWrite.writeToFile
+        );
+
+        try
+        {
+            const summary = await runAIAnalysis(repository, {
+                name     : 'main',
+                commit   : 'commit-123',
+                upstream : { remote: 'origin', name: 'main' },
+                behind   : 1
+            }, 'origin/main', 'target-123', 1);
+
+            assert.equal(summary?.hash, 'target-123');
+            assert.match(String(summary?.summary), /No issues or summaries found|^\[\]$/);
+        }
+        finally
+        {
+            restoreWrite();
             restoreAnalyze();
         }
     });

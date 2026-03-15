@@ -1,5 +1,6 @@
 import * as assert from 'assert/strict';
 import * as vscode from 'vscode';
+import * as fileWrite from '../utl/fileWrite';
 import * as repositoryChecker from '../gitTools/repositoryChecker';
 import { gitMonitor } from '../gitTools/gitMonitor';
 import { createDisposable, stubMethod } from './helpers/testUtils';
@@ -183,6 +184,213 @@ suite('gitMonitor', () =>
             globalThis.setTimeout = originalSetTimeout;
             globalThis.clearInterval = originalClearInterval;
             globalThis.setInterval = originalSetInterval;
+            restoreCheck();
+            restoreConfigListener();
+            restoreGitExtension();
+        }
+    });
+
+    test('returned refresh handler runs manual checks for all monitored repositories', async () =>
+    {
+        const repositoryA = createRepository({
+            state: {
+                HEAD        : {
+                    commit   : 'head-a',
+                    name     : 'feature/a',
+                    behind   : 1,
+                    upstream : { remote: 'origin', name: 'main' }
+                },
+                refs        : new Map<string, { behind?: number }>(),
+                onDidChange : createEventEmitter<void>().event
+            }
+        });
+        const repositoryB = createRepository({
+            state: {
+                HEAD        : {
+                    commit   : 'head-b',
+                    name     : 'feature/b',
+                    behind   : 2,
+                    upstream : { remote: 'origin', name: 'main' }
+                },
+                refs        : new Map<string, { behind?: number }>(),
+                onDidChange : createEventEmitter<void>().event
+            }
+        });
+        const manualCalls: any[] = [];
+
+        const restoreGitExtension = stubMethod(
+            vscode.extensions,
+            'getExtension',
+            (() =>
+            {
+                return {
+                    id            : 'vscode.git',
+                    extensionUri  : {} as vscode.Uri,
+                    extensionPath : '',
+                    isActive      : true,
+                    packageJSON   : {},
+                    exports       : {
+                        getAPI: () => ({
+                            repositories        : [repositoryA, repositoryB],
+                            onDidOpenRepository : (): { dispose: () => void } => ({ dispose: (): void => undefined })
+                        })
+                    },
+                    activate      : async () => undefined,
+                    extensionKind : vscode.ExtensionKind.Workspace
+                } as unknown as vscode.Extension<any>;
+            }) as typeof vscode.extensions.getExtension
+        );
+        const restoreConfigListener = stubMethod(
+            vscode.workspace,
+            'onDidChangeConfiguration',
+            ((_: (event: vscode.ConfigurationChangeEvent) => void) =>
+                ({ dispose: (): void => undefined })) as typeof vscode.workspace.onDidChangeConfiguration
+        );
+        const restoreCheck = stubMethod(
+            repositoryChecker,
+            'checkRepository',
+            (async (repository, _state, _provider, isManual) =>
+            {
+                manualCalls.push({ repository, isManual });
+            }) as typeof repositoryChecker.checkRepository
+        );
+        const originalSetInterval = globalThis.setInterval;
+        const originalClearInterval = globalThis.clearInterval;
+        globalThis.setInterval = (((_fn: () => void): NodeJS.Timeout =>
+            createDisposable() as unknown as NodeJS.Timeout) as typeof setInterval);
+        globalThis.clearInterval =
+            (((_handle: NodeJS.Timeout): void => undefined) as typeof clearInterval);
+
+        try
+        {
+            const refreshNow = gitMonitor(
+                createExtensionContext(),
+                { addSummary: (): void => undefined, clearSummaries: (): void => undefined } as any
+            );
+
+            manualCalls.length = 0;
+            await refreshNow();
+
+            assert.equal(manualCalls.length, 2);
+            assert.equal(manualCalls.every((call) => call.isManual === true), true);
+        }
+        finally
+        {
+            globalThis.clearInterval = originalClearInterval;
+            globalThis.setInterval = originalSetInterval;
+            restoreCheck();
+            restoreConfigListener();
+            restoreGitExtension();
+        }
+    });
+
+    test('clears summaries and review file when a pull is detected from HEAD changes', () =>
+    {
+        const stateEmitter = createEventEmitter<void>();
+        const repository = createRepository({
+            state: {
+                HEAD        : {
+                    commit   : 'head-old',
+                    name     : 'feature/a',
+                    behind   : 3,
+                    upstream : { remote: 'origin', name: 'main' }
+                },
+                refs        : new Map<string, { behind?: number }>(),
+                onDidChange : stateEmitter.event
+            }
+        });
+        let clearedSummaries = 0;
+        let clearedReviews = 0;
+        const infoMessages: string[] = [];
+
+        const restoreGitExtension = stubMethod(
+            vscode.extensions,
+            'getExtension',
+            (() =>
+            {
+                return {
+                    id            : 'vscode.git',
+                    extensionUri  : {} as vscode.Uri,
+                    extensionPath : '',
+                    isActive      : true,
+                    packageJSON   : {},
+                    exports       : {
+                        getAPI: () => ({
+                            repositories        : [repository],
+                            onDidOpenRepository : (): { dispose: () => void } => ({ dispose: (): void => undefined })
+                        })
+                    },
+                    activate      : async () => undefined,
+                    extensionKind : vscode.ExtensionKind.Workspace
+                } as unknown as vscode.Extension<any>;
+            }) as typeof vscode.extensions.getExtension
+        );
+        const restoreConfigListener = stubMethod(
+            vscode.workspace,
+            'onDidChangeConfiguration',
+            ((_: (event: vscode.ConfigurationChangeEvent) => void) =>
+                ({ dispose: (): void => undefined })) as typeof vscode.workspace.onDidChangeConfiguration
+        );
+        const restoreCheck = stubMethod(
+            repositoryChecker,
+            'checkRepository',
+            (async (): Promise<void> => undefined) as typeof repositoryChecker.checkRepository
+        );
+        const restoreClearReview = stubMethod(
+            fileWrite,
+            'clearReviewFile',
+            (async (): Promise<void> =>
+            {
+                clearedReviews += 1;
+            }) as typeof fileWrite.clearReviewFile
+        );
+        const restoreInfo = stubMethod(
+            vscode.window,
+            'showInformationMessage',
+            ((message: string) =>
+            {
+                infoMessages.push(message);
+                return Promise.resolve(undefined);
+            }) as typeof vscode.window.showInformationMessage
+        );
+        const originalSetInterval = globalThis.setInterval;
+        const originalClearInterval = globalThis.clearInterval;
+        globalThis.setInterval = (((_fn: () => void): NodeJS.Timeout =>
+            createDisposable() as unknown as NodeJS.Timeout) as typeof setInterval);
+        globalThis.clearInterval =
+            (((_handle: NodeJS.Timeout): void => undefined) as typeof clearInterval);
+
+        try
+        {
+            gitMonitor(
+                createExtensionContext(),
+                {
+                    addSummary     : (): void => undefined,
+                    clearSummaries : (): void =>
+                    {
+                        clearedSummaries += 1;
+                    }
+                } as any
+            );
+
+            repository.state.HEAD = {
+                commit   : 'head-new',
+                name     : 'feature/a',
+                behind   : 0,
+                upstream : { remote: 'origin', name: 'main' }
+            };
+            stateEmitter.fire();
+
+            assert.equal(clearedSummaries, 1);
+            assert.equal(clearedReviews, 1);
+            assert.equal(infoMessages.some((message) => /Pull detected/i.test(message)), true);
+        }
+        finally
+        {
+            globalThis.clearInterval = originalClearInterval;
+            globalThis.setInterval = originalSetInterval;
+            restoreInfo();
+            restoreClearReview();
             restoreCheck();
             restoreConfigListener();
             restoreGitExtension();

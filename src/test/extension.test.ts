@@ -133,4 +133,54 @@ suite('extension activation', () =>
     {
         assert.equal(extension.deactivate(), undefined);
     });
+
+    test('activate wires the refresh handler returned by gitMonitor into the provider', () =>
+    {
+        const refreshHandler = async (): Promise<void> => undefined;
+        let setRefreshHandlerArg: unknown;
+
+        const restoreConfig = stubMethod(
+            configModule,
+            'getPullerBearConfig',
+            (() => ({
+                fetchIntervalMinutes    : 1,
+                commitWindowMinutes     : 60,
+                warningCommitThreshold  : 2,
+                hardStopCommitThreshold : 5,
+                branchRef               : 'main',
+                apiKey                  : 'configured'
+            })) as typeof configModule.getPullerBearConfig
+        );
+        const restoreRegister = stubMethod(
+            vscode.window,
+            'registerWebviewViewProvider',
+            (() => createDisposable()) as typeof vscode.window.registerWebviewViewProvider
+        );
+        const restoreMonitor = stubMethod(
+            gitMonitorModule,
+            'gitMonitor',
+            (() => refreshHandler) as typeof gitMonitorModule.gitMonitor
+        );
+        const restoreSetRefreshHandler = stubMethod(
+            ExplainerViewProvider.prototype,
+            'setRefreshHandler',
+            ((handler: unknown): void =>
+            {
+                setRefreshHandlerArg = handler;
+            }) as ExplainerViewProvider['setRefreshHandler']
+        );
+
+        try
+        {
+            extension.activate(createExtensionContext());
+            assert.equal(setRefreshHandlerArg, refreshHandler);
+        }
+        finally
+        {
+            restoreSetRefreshHandler();
+            restoreMonitor();
+            restoreRegister();
+            restoreConfig();
+        }
+    });
 });

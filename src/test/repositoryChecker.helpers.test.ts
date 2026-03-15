@@ -120,4 +120,64 @@ suite('repositoryChecker helper functions', () =>
         assert.equal(repositoryChecker.exceedsHardStopThreshold(5, baseConfig), true);
         assert.equal(repositoryChecker.exceedsWarningThreshold(2, baseConfig), false);
     });
+
+    test('getTargetCommitHash falls back to repository refs when getBranch fails', async () =>
+    {
+        const repository = createRepository({
+            getBranch : async (): Promise<void> =>
+            {
+                throw new Error('branch lookup failed');
+            },
+            state     : {
+                HEAD : {
+                    commit   : 'head-commit',
+                    name     : 'feature/test',
+                    behind   : 1,
+                    upstream : { remote: 'origin', name: 'main' }
+                },
+                refs : [
+                    {
+                        name   : 'main',
+                        remote : 'origin',
+                        commit : 'refs-commit'
+                    }
+                ]
+            }
+        });
+
+        assert.equal(await repositoryChecker.getTargetCommitHash(repository, 'origin/main'), 'refs-commit');
+    });
+
+    test('normalizeDiffPayload handles string, array, and object payloads', () =>
+    {
+        assert.equal(repositoryChecker.normalizeDiffPayload('diff --git a/x b/x'), 'diff --git a/x b/x');
+        assert.match(
+            repositoryChecker.normalizeDiffPayload([
+                {
+                    status      : 'M',
+                    uri         : { fsPath: '/tmp/a.ts' },
+                    originalUri : { fsPath: '/tmp/old-a.ts' }
+                }
+            ]),
+            /old-a\.ts/
+        );
+        assert.match(
+            repositoryChecker.normalizeDiffPayload({ changed: true }),
+            /"changed": true/
+        );
+    });
+
+    test('createFallbackSummary mentions API key setup when that is the failure', () =>
+    {
+        const summary = repositoryChecker.createFallbackSummary(
+            {
+                upstream : { remote: 'origin', name: 'main' }
+            },
+            2,
+            'sha-1',
+            'API key not configured. Please set pullerBear.apiKey in VS Code settings.'
+        );
+
+        assert.match(summary.summary, /pullerBear\.apiKey/);
+    });
 });
