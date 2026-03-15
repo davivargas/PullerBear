@@ -56,6 +56,16 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
+    /**
+     * Clears all summaries and updates the webview.
+     * Called when a git pull is detected, since the incoming changes
+     * have been integrated and the summaries are no longer relevant.
+     */
+    public clearSummaries() {
+        this._summaries = [];
+        this._pushSummaries();
+    }
+
     private _pushSummaries() {
         if (this._view) {
             this._view.webview.postMessage({

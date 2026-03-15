@@ -56,6 +56,33 @@ function initializeRepositoryMonitor(
     // Start the monitor
     startMonitor(repository, state, checkFn);
 
+    // Detect git pull by monitoring HEAD commit changes
+    const stateChangeDisposable = repository.state.onDidChange(() =>
+    {
+        const currentHead = repository.state?.HEAD;
+        const currentCommit = currentHead?.commit;
+        const currentBehind = currentHead?.behind ?? 0;
+
+        if (currentCommit && currentCommit !== state.lastHeadCommit)
+        {
+            // HEAD moved forward — if we were behind, this is likely a pull/merge
+            if (state.lastBehindCount > 0 && currentBehind < state.lastBehindCount)
+            {
+                console.log(
+                    `[PullerBear] Pull detected: HEAD moved from ${state.lastHeadCommit} to ${currentCommit}. ` +
+                    `Behind count: ${state.lastBehindCount} → ${currentBehind}`
+                );
+                provider.clearSummaries();
+                vscode.window.showInformationMessage(
+                    '🐻‍❄️ PullerBear: Pull detected! Summaries cleared.'
+                );
+            }
+
+            state.lastHeadCommit = currentCommit;
+            state.lastBehindCount = currentBehind;
+        }
+    });
+
     // Handle configuration changes
     const configChangeDisposable = vscode.workspace.onDidChangeConfiguration((event) =>
     {
@@ -69,11 +96,12 @@ function initializeRepositoryMonitor(
     const closeDisposable = repository.onDidClose(() =>
     {
         clearMonitorInterval(state);
+        stateChangeDisposable.dispose();
         configChangeDisposable.dispose();
         closeDisposable.dispose();
     });
 
-    context.subscriptions.push(configChangeDisposable, closeDisposable);
+    context.subscriptions.push(stateChangeDisposable, configChangeDisposable, closeDisposable);
 }
 
 /**
