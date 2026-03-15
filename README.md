@@ -1,73 +1,64 @@
 # PullerBear
-A git pull alert and explainer
-# pullerbear README
 
-This is the README for your extension "pullerbear". After writing up a brief description, we recommend including the following sections.
+A VS Code extension that notifies you to do a git pull when you first open a project. It also explains what you just pulled and warns about any potential errors.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+- **Automatic Pull Notifications**: Get notified when you open a project that has remote changes to pull
+- **Pull Explanation**: Understand what changes were pulled with AI-powered explanations
+- **Error Warnings**: Get warned about potential conflicts or issues before pulling
+- **Sidebar Integration**: View pull details in a dedicated sidebar panel
+- **Configurable Monitoring**: Adjust how often PullerBear checks for remote changes
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+- Visual Studio Code ^1.110.0
+- Git extension (built into VS Code)
+- An OpenRouter API key (for AI-powered explanations)
 
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+PullerBear contributes the following settings:
 
-For example:
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `pullerbear.fetchIntervalMinutes` | 5 | How often PullerBear checks the remote repository for changes (in minutes) |
+| `pullerbear.commitWindowMinutes` | 60 | Rolling time window, in minutes, used to count incoming commits |
+| `pullerbear.warningCommitThreshold` | 2 | If incoming commits exceed this value, PullerBear asks for confirmation before summarizing |
+| `pullerbear.hardStopCommitThreshold` | 5 | If incoming commits reach this value, PullerBear pauses summarization until the time window resets |
 
-This extension contributes the following settings:
+## Getting Started
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+1. Install PullerBear from the VS Code Marketplace
+2. Open a Git repository in VS Code
+3. PullerBear will automatically start monitoring for remote changes
+4. When changes are detected, you'll receive a notification to pull
+5. After pulling, view the explanation in the PullerBear sidebar
 
-## Known Issues
+## Architecture
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+PullerBear consists of several components:
+
+- **Git Monitor** (`src/gitTools/gitMonitor.ts`): Monitors remote repositories for changes
+- **Repository Checker** (`src/gitTools/repositoryChecker.ts`): Checks repository status and detects incoming commits
+- **Git State** (`src/gitTools/gitState.ts`): Manages git state and tracks changes
+- **AI Client** (`src/ai/aiClient.ts`): Provides AI-powered explanations of pulled changes
+- **Webview** (`src/webview/App.tsx`): Sidebar UI for displaying pull information
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
+### 0.0.1
 
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+Initial release of PullerBear
 
 ---
 
-## Following extension guidelines
+## Contributing
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+Contributions are welcome! Please feel free to submit issues and pull requests on the GitHub repository.
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+## License
 
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+MIT
 
 **Enjoy!**
