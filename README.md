@@ -28,8 +28,8 @@ Install the extension from the VS Code Marketplace once published.
 ### Option B: Install from VSIX (local/manual)
 
 1. Package the extension:
-	 - `npm install`
-	 - `npx vsce package`
+   - `npm install`
+   - `npx vsce package`
 2. In VS Code, open Extensions view.
 3. Click `...` (top-right) → **Install from VSIX...**
 4. Select the generated `.vsix` file.
@@ -46,25 +46,25 @@ Install the extension from the VS Code Marketplace once published.
 
 Configure in **Settings** (`Ctrl+,`) by searching `PullerBear`, or in `settings.json`.
 
-| Setting | Type | Default | Description |
-|---|---|---:|---|
-| `pullerBear.apiKey` | `string` | `""` | OpenRouter API key used for AI summarization/Q&A. |
-| `pullerBear.fetchIntervalMinutes` | `number` | `10` | How often PullerBear checks for remote updates. |
-| `pullerBear.commitWindowMinutes` | `number` | `60` | Time window used to measure incoming commit volume. |
-| `pullerBear.warningCommitThreshold` | `number` | `2` | Shows a warning prompt above this commit volume. |
-| `pullerBear.hardStopCommitThreshold` | `number` | `5` | Stops summarization at/above this commit volume. |
-| `pullerBear.branchRef` | `string` | `"main"` | Target remote branch to compare against (e.g. `main`, `upstream`, `origin/main`). |
+| Setting                              | Type     |  Default | Description                                                                       |
+| ------------------------------------ | -------- | -------: | --------------------------------------------------------------------------------- |
+| `pullerBear.apiKey`                  | `string` |     `""` | OpenRouter API key used for AI summarization/Q&A.                                 |
+| `pullerBear.fetchIntervalMinutes`    | `number` |     `10` | How often PullerBear checks for remote updates.                                   |
+| `pullerBear.commitWindowMinutes`     | `number` |     `60` | Time window used to measure incoming commit volume.                               |
+| `pullerBear.warningCommitThreshold`  | `number` |      `2` | Shows a warning prompt above this commit volume.                                  |
+| `pullerBear.hardStopCommitThreshold` | `number` |      `5` | Stops summarization at/above this commit volume.                                  |
+| `pullerBear.branchRef`               | `string` | `"main"` | Target remote branch to compare against (e.g. `main`, `upstream`, `origin/main`). |
 
 ### Example `settings.json`
 
 ```json
 {
-	"pullerBear.apiKey": "sk-or-v1-...",
-	"pullerBear.fetchIntervalMinutes": 5,
-	"pullerBear.commitWindowMinutes": 60,
-	"pullerBear.warningCommitThreshold": 3,
-	"pullerBear.hardStopCommitThreshold": 8,
-	"pullerBear.branchRef": "main"
+  "pullerBear.apiKey": "sk-or-v1-...",
+  "pullerBear.fetchIntervalMinutes": 5,
+  "pullerBear.commitWindowMinutes": 60,
+  "pullerBear.warningCommitThreshold": 3,
+  "pullerBear.hardStopCommitThreshold": 8,
+  "pullerBear.branchRef": "main"
 }
 ```
 
