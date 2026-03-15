@@ -145,9 +145,18 @@ export async function runAIAnalysis(
         // Compare HEAD with upstream branch to get incoming changes
         const upstreamRef = `${head.upstream.remote}/${head.upstream.name}`;
         const diffText = await repository.diff(`${upstreamRef}...HEAD`);
+        
+        // Check if diff is available
+        if (!diffText || typeof diffText !== 'string')
+        {
+            console.warn('[PullerBear] No diff available for analysis');
+            const behindCount = head.behind ?? 0;
+            return createFallbackSummary(head, behindCount);
+        }
+        
         const analysis = await analyzeCode({
             branchName : head.name ?? 'unknown',
-            diffText   : typeof diffText === 'string' ? diffText : ''
+            diffText   : diffText
         });
 
         // Extract AI summary text from OpenRouter response
@@ -219,11 +228,15 @@ export async function checkRepository(
         // Use the configured branchRef to determine behind count
         const currentBehind = getConfiguredBranchBehindCount(repository);
 
-        // If not behind the configured branch, notify and exit
+        // If not behind the configured branch, only notify if we were previously behind
         if (currentBehind <= 0)
         {
-            // Explicitly notify the user that they are up to date
-            showUpToDateMessage();
+            // Only show "up to date" if we were previously behind
+            if (state.lastBehindCount > 0)
+            {
+                showUpToDateMessage();
+            }
+            state.lastBehindCount = currentBehind;
             return;
         }
 

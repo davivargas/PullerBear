@@ -45,8 +45,8 @@ export function App() {
                 </div>
             ) : (
                 <ul style={styles.list}>
-                    {summaries.map((s) => (
-                        <li key={s.hash} style={styles.card}>
+                    {summaries.map((s, index) => (
+                        <li key={`${s.hash}-${s.timestamp}-${index}`} style={styles.card}>
                             <div style={styles.cardHeader}>
                                 <code style={styles.hash}>{s.hash.slice(0, 7)}</code>
                                 <span style={styles.date}>
