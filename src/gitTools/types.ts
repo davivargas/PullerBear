@@ -5,6 +5,7 @@ export interface RepoMonitorState
 {
     commitTimestamps : number[];
     lastBehindCount  : number;
+    lastHeadCommit?  : string;
     intervalHandle?  : NodeJS.Timeout;
     isChecking       : boolean;
 }
