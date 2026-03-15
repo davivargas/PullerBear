@@ -10,7 +10,6 @@ import {
     getCommitsInWindow
 } from './commitTracker';
 import { writeToFile } from '../utl/fileWrite';
-import { detectDefaultBranch, getBranchBehindCount, getConfiguredBranchBehindCount } from './gitState';
 
 /**
  * Checks if the repository has an upstream branch configured
@@ -84,16 +83,42 @@ export function showRemoteChangesMessage(behindCount: number): void
 }
 
 /**
+ * Looks up the upstream HEAD commit SHA from repository refs.
+ */
+export async function getUpstreamCommitHash(repository: any, head: any): Promise<string> {
+    const upstreamRef = `${head.upstream.remote}/${head.upstream.name}`;
+    
+    try {
+        const branch = await repository.getBranch(upstreamRef);
+        if (branch && branch.commit) {
+            return branch.commit;
+        }
+    } catch (e) {
+        console.warn(`[PullerBear] Failed to get branch for ${upstreamRef}:`, e);
+    }
+
+    const refs: any[] = repository.state?.refs ?? [];
+    const match = refs.find((r: any) => 
+        r.name === upstreamRef || 
+        r.name === `refs/remotes/${upstreamRef}` || 
+        (r.remote === head.upstream.remote && r.name === head.upstream.name)
+    );
+    return match?.commit ?? 'unknown';
+}
+
+/**
  * Creates a commit summary from the analysis results
  */
 export function createCommitSummary(
     head: any,
     behindCount: number,
-    summaryText: string
+    summaryText: string,
+    upstreamSha: string
 ): CommitSummary
 {
+    const dedupKey = upstreamSha;
     return createCommitSummaryObject(
-        head.commit ?? 'unknown',
+        dedupKey,
         behindCount,
         head.upstream.remote,
         head.upstream.name,
@@ -120,15 +145,16 @@ export const createCommitSummaryObject = (
 /**
  * Creates a fallback commit summary when AI fails
  */
-export function createFallbackSummary(head: any, behindCount: number): CommitSummary
+export function createFallbackSummary(head: any, behindCount: number, upstreamSha: string): CommitSummary
 {
+    const dedupKey = upstreamSha;
     return {
-        hash      : head.commit ?? 'unknown',
-        message   : `${behindCount} new commit(s) on ` +
-                    `${head.upstream.remote}/${head.upstream.name}`,
-        summary   : `You are ${behindCount} commit(s) behind. ` +
-                    `AI summary unavailable.`,
-        timestamp : Date.now()
+        hash        : dedupKey,
+        message     : `${behindCount} new commit(s) on ` +
+                      `${head.upstream.remote}/${head.upstream.name}`,
+        summary     : `You are ${behindCount} commit(s) behind. ` +
+                      `AI summary unavailable.`,
+        timestamp   : Date.now()
     };
 }
 
@@ -137,7 +163,8 @@ export function createFallbackSummary(head: any, behindCount: number): CommitSum
  */
 export async function runAIAnalysis(
     repository: any,
-    head: any
+    head: any,
+    upstreamSha: string
 ): Promise<CommitSummary | null>
 {
     try
@@ -145,18 +172,9 @@ export async function runAIAnalysis(
         // Compare HEAD with upstream branch to get incoming changes
         const upstreamRef = `${head.upstream.remote}/${head.upstream.name}`;
         const diffText = await repository.diff(`${upstreamRef}...HEAD`);
-        
-        // Check if diff is available
-        if (!diffText || typeof diffText !== 'string')
-        {
-            console.warn('[PullerBear] No diff available for analysis');
-            const behindCount = head.behind ?? 0;
-            return createFallbackSummary(head, behindCount);
-        }
-        
         const analysis = await analyzeCode({
             branchName : head.name ?? 'unknown',
-            diffText   : diffText
+            diffText   : typeof diffText === 'string' ? diffText : ''
         });
 
         // Extract AI summary text from OpenRouter response
@@ -165,7 +183,7 @@ export async function runAIAnalysis(
             JSON.stringify(analysis);
 
         const behindCount = head.behind ?? 0;
-        const summary =  createCommitSummary(head, behindCount, summaryText);
+        const summary =  createCommitSummary(head, behindCount, summaryText, upstreamSha);
         writeToFile(summary);
         return summary;
     }
@@ -173,7 +191,7 @@ export async function runAIAnalysis(
     {
         console.error('[PullerBear] AI analysis failed:', aiError);
         const behindCount = head.behind ?? 0;
-        return createFallbackSummary(head, behindCount);
+        return createFallbackSummary(head, behindCount, upstreamSha);
     }
 }
 
@@ -205,7 +223,8 @@ export function exceedsWarningThreshold(
 export async function checkRepository(
     repository: any,
     state: RepoMonitorState,
-    provider: ExplainerViewProvider
+    provider: ExplainerViewProvider,
+    isManual: boolean = false
 ): Promise<void>
 {
     if (state.isChecking)
@@ -219,27 +238,22 @@ export async function checkRepository(
     {
         const config = getPullerBearConfig();
         const windowMs = config.commitWindowMinutes * 60 * 1000;
-        const branchRef = config.branchRef || 'main';
 
         // Fetch all branches from all remotes
         await repository.fetch();
         console.log('[PullerBear] Fetched latest from remote.');
 
-        // Use the configured branchRef to determine behind count
-        const currentBehind = getConfiguredBranchBehindCount(repository);
+        const head = repository.state?.HEAD;
 
-        // If not behind the configured branch, only notify if we were previously behind
-        if (currentBehind <= 0)
+        // If the branch has no upstream, warn and exit
+        if (!hasUpstreamBranch(head))
         {
-            // Only show "up to date" if we were previously behind
-            if (state.lastBehindCount > 0)
-            {
-                showUpToDateMessage();
-            }
-            state.lastBehindCount = currentBehind;
+            console.log('[PullerBear] No upstream branch set.');
+            showNoUpstreamMessage();
             return;
         }
 
+        const currentBehind = head.behind ?? 0;
         const newIncomingCommits = calculateNewCommits(currentBehind, state.lastBehindCount);
 
         state.lastBehindCount = currentBehind;
@@ -249,6 +263,16 @@ export async function checkRepository(
 
         // Get commits in window (also prunes old ones)
         const commitsInWindow = getCommitsInWindow(state.commitTimestamps, windowMs);
+
+        if (currentBehind <= 0)
+        {
+            if (isManual) {
+                vscode.window.showInformationMessage(
+                    '🐻‍❄️ PullerBear: You\'re all caught up! No new commits to summarize.'
+                );
+            }
+            return;
+        }
 
         if (exceedsHardStopThreshold(commitsInWindow, config))
         {
@@ -266,23 +290,26 @@ export async function checkRepository(
             }
         }
 
+        // Look up the real upstream commit SHA for dedup + display
+        const upstreamSha = await getUpstreamCommitHash(repository, head);
+        const dedupKey = upstreamSha;
+
+        // Skip AI analysis if we already have a summary for this upstream state
+        if (provider.hasSummary(dedupKey)) {
+            if (isManual) {
+                vscode.window.showInformationMessage(
+                    '🐻‍❄️ PullerBear: No new commits to summarize.'
+                );
+            }
+            return;
+        }
+
         const behindCount: number = currentBehind;
 
         showRemoteChangesMessage(behindCount);
 
-        // Create a mock head object for runAIAnalysis that uses branchRef
-        const head = {
-            commit: repository.state?.HEAD?.commit ?? 'unknown',
-            name: branchRef,
-            upstream: {
-                remote: 'origin',
-                name: branchRef
-            },
-            behind: behindCount
-        };
-
         // Run AI analysis and push results to the sidebar
-        const summary = await runAIAnalysis(repository, head);
+        const summary = await runAIAnalysis(repository, head, upstreamSha);
 
         if (summary)
         {

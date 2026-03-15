@@ -1,6 +1,4 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
 
 export interface CommitSummary {
     hash: string;
@@ -42,10 +40,20 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
 
     /**
      * Adds a new commit summary and pushes it to the webview.
+     * Only adds the summary if a commit with the same hash isn't already present.
      */
+    /**
+     * Returns true if a summary with the given hash already exists.
+     */
+    public hasSummary(hash: string): boolean {
+        return this._summaries.some(s => s.hash === hash);
+    }
+
     public addSummary(summary: CommitSummary) {
-        this._summaries.unshift(summary); // newest first
-        this._pushSummaries();
+        if (!this.hasSummary(summary.hash)) {
+            this._summaries.unshift(summary); // newest first
+            this._pushSummaries();
+        }
     }
 
     private _pushSummaries() {

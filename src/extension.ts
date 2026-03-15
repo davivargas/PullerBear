@@ -2,8 +2,7 @@ import * as vscode from 'vscode';
 import { gitMonitor } from './gitTools/gitMonitor';
 import { ExplainerViewProvider } from './ExplainerViewProvider';
 
-export function activate(context: vscode.ExtensionContext): void
-{
+export function activate(context: vscode.ExtensionContext) {
     console.log('[PullerBear] Extension activated.');
 
     // Register the "What's New" sidebar webview
@@ -19,4 +18,4 @@ export function activate(context: vscode.ExtensionContext): void
     gitMonitor(context, provider);
 }
 
-export function deactivate(): void {}
+export function deactivate() {}

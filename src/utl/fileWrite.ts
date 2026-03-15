@@ -22,9 +22,8 @@ export async function writeToFile(reviews: any) : Promise<void>
             if (!Array.isArray(existingData)) {
                 existingData = [];
             }
-        } catch (e) {
-            // File doesn't exist or is corrupted, start with empty array
-            console.warn('[PullerBear] Could not parse existing reviews file, starting fresh:', e);
+        } catch {
+            // File doesn't exist yet, start with empty array
             existingData = [];
         }
 

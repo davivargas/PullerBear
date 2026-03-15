@@ -26,7 +26,7 @@
         {
           "id": "pullerbear-sidebar",
           "title": "PullerBear",
-          "icon": "resources/pullerbear.svg"
+          "icon": "resources/bear.svg"
         }
       ]
     },
@@ -38,35 +38,6 @@
           "name": "What's New"
         }
       ]
-    },
-    "configuration": {
-      "title": "PullerBear",
-      "properties": {
-        "pullerbear.fetchIntervalMinutes": {
-          "type": "number",
-          "default": 5,
-          "minimum": 1,
-          "description": "How often PullerBear checks the remote repository for changes."
-        },
-        "pullerbear.commitWindowMinutes": {
-          "type": "number",
-          "default": 60,
-          "minimum": 1,
-          "description": "Rolling time window, in minutes, used to count incoming commits."
-        },
-        "pullerbear.warningCommitThreshold": {
-          "type": "number",
-          "default": 2,
-          "minimum": 1,
-          "description": "If the number of incoming commits in the rolling window exceeds this value, PullerBear asks for confirmation before summarizing."
-        },
-        "pullerbear.hardStopCommitThreshold": {
-          "type": "number",
-          "default": 5,
-          "minimum": 1,
-          "description": "If the number of incoming commits in the rolling window reaches this value, PullerBear pauses summarization until the time window resets."
-        }
-      }
     }
   },
   "scripts": {
@@ -100,7 +71,6 @@
   },
   "dependencies": {
     "@openrouter/sdk": "^0.9.11",
-    "dotenv": "^17.3.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   }

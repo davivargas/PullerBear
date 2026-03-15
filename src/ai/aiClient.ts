@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { diffContext } from "./promptBuilder";
 import { buildPrompt } from "./promptBuilder";
 
