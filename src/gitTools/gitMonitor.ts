@@ -1,7 +1,86 @@
 import * as vscode from 'vscode';
 import { analyzeCode } from '../ai/aiClient';
 import { ExplainerViewProvider, CommitSummary } from '../ExplainerViewProvider';
+import { getPullerBearConfig } from '../config/pullerBearConfig';
+import { RepoMonitorState } from './types';
+import { createRepoState, createRepoStateMap, isRepositoryMonitored, setMonitorInterval, clearMonitorInterval } from './gitState';
+import { checkRepository } from './repositoryChecker';
 
+/**
+ * Starts the monitoring interval for a repository
+ */
+function startMonitor(
+    repository: any,
+    state: RepoMonitorState,
+    checkFn: (repo: any, state: RepoMonitorState) => Promise<void>
+): void
+{
+    const config = getPullerBearConfig();
+    const intervalMs = config.fetchIntervalMinutes * 60 * 1000;
+
+    if (state.intervalHandle)
+    {
+        clearMonitorInterval(state);
+    }
+
+    void checkFn(repository, state);
+
+    state.intervalHandle = setInterval(() =>
+    {
+        void checkFn(repository, state);
+    }, intervalMs);
+}
+
+/**
+ * Initializes monitoring for a single repository
+ */
+function initializeRepositoryMonitor(
+    repository: any,
+    repoStates: WeakMap<any, RepoMonitorState>,
+    provider: ExplainerViewProvider,
+    context: vscode.ExtensionContext
+): void
+{
+    if (isRepositoryMonitored(repoStates, repository))
+    {
+        return;
+    }
+
+    const state = createRepoState(repository);
+    repoStates.set(repository, state);
+
+    const checkFn = async (repo: any, repoState: RepoMonitorState): Promise<void> =>
+    {
+        await checkRepository(repo, repoState, provider);
+    };
+
+    // Start the monitor
+    startMonitor(repository, state, checkFn);
+
+    // Handle configuration changes
+    const configChangeDisposable = vscode.workspace.onDidChangeConfiguration((event) =>
+    {
+        if (event.affectsConfiguration('pullerbear'))
+        {
+            startMonitor(repository, state, checkFn);
+        }
+    });
+
+    // Handle repository close
+    const closeDisposable = repository.onDidClose(() =>
+    {
+        clearMonitorInterval(state);
+        configChangeDisposable.dispose();
+        closeDisposable.dispose();
+    });
+
+    context.subscriptions.push(configChangeDisposable, closeDisposable);
+}
+
+/**
+ * Main entry point for Git monitoring
+ * Sets up repository change listeners and initializes monitors for existing repos
+ */
 export function gitMonitor(
     context: vscode.ExtensionContext,
     provider: ExplainerViewProvider
@@ -18,100 +97,17 @@ export function gitMonitor(
 
     // Get the Git API
     const git = gitExtension.exports.getAPI(1);
+    const repoStates = createRepoStateMap();
 
-    const checkRepository = async (repository: any) => {
-        try {
-            // Fetch all branches from all remotes
-            await repository.fetch();
-            console.log('[PullerBear] Fetched latest from remote.');
-
-            const head = repository.state.HEAD;
-
-            // If the branch has no upstream, warn and exit
-            if (!head || !head.upstream) {
-                console.log('[PullerBear] No upstream branch set.');
-                vscode.window.showInformationMessage(
-                    '🐻‍❄️ PullerBear: No upstream branch set for the current branch.'
-                );
-                return;
-            }
-
-            if (!head.behind || head.behind === 0) {
-                // Explicitly notify the user that they are up to date
-                vscode.window.showInformationMessage(
-                    "🐻‍❄️ PullerBear: You're up to date! No new commits on the remote."
-                );
-                return;
-            }
-
-            const behindCount: number = head.behind;
-            vscode.window.showInformationMessage(
-                `🐻‍❄️ PullerBear: Remote changes detected — you're behind by ${behindCount} commit(s).`
-            );
-
-            // Run AI analysis and push results to the sidebar
-            try {
-                const diffText = await repository.diff(true); // staged + unstaged
-                const analysis = await analyzeCode({
-                    branchName: head.name,
-                    diffText: typeof diffText === 'string' ? diffText : '',
-                });
-
-                // Extract AI summary text from OpenRouter response
-                const summaryText =
-                    analysis?.choices?.[0]?.message?.content ??
-                    JSON.stringify(analysis);
-
-                const summary: CommitSummary = {
-                    hash: head.commit ?? 'unknown',
-                    message: `${behindCount} new commit(s) on ${head.upstream.remote}/${head.upstream.name}`,
-                    summary: summaryText,
-                    timestamp: Date.now(),
-                };
-                provider.addSummary(summary);
-            } catch (aiError) {
-                console.error('[PullerBear] AI analysis failed:', aiError);
-                // Still show a basic summary in the sidebar even if AI fails
-                const fallback: CommitSummary = {
-                    hash: head.commit ?? 'unknown',
-                    message: `${behindCount} new commit(s) on ${head.upstream.remote}/${head.upstream.name}`,
-                    summary: `You are ${behindCount} commit(s) behind. AI summary unavailable.`,
-                    timestamp: Date.now(),
-                };
-                provider.addSummary(fallback);
-            }
-        } catch (error) {
-            console.error('[PullerBear] Error fetching repository:', error);
-            vscode.window.showErrorMessage('PullerBear: Error fetching repository.');
-        }
-    };
-
-    git.onDidOpenRepository((repository: any) => {
-        // Run immediately when the repo is opened
-        checkRepository(repository);
-
-        // Then poll every 5 minutes
-        const pullRate = setInterval(() => {
-            checkRepository(repository);
-        }, 5 * 60 * 1000);
-
-        // Clean up the interval when the repository is closed
-        repository.onDidClose(() => {
-            clearInterval(pullRate);
-        });
+    // Listen for new repositories being opened
+    git.onDidOpenRepository((repository: any) =>
+    {
+        initializeRepositoryMonitor(repository, repoStates, provider, context);
     });
 
     // Also check repositories that are already open
-    for (const repo of git.repositories) {
-        checkRepository(repo);
+    for (const repo of git.repositories)
+    {
+        initializeRepositoryMonitor(repo, repoStates, provider, context);
     }
-
-    // Return a refresh function
-    return {
-        refresh: () => {
-            for (const repo of git.repositories) {
-                checkRepository(repo);
-            }
-        }
-    };
 }
