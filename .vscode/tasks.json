@@ -3,6 +3,24 @@
 {
 	"version": "2.0.0",
 	"tasks": [
+        {
+            "type": "npm",
+            "script": "compile",
+            "group": "build",
+            "label": "npm: compile",
+            "presentation": {
+                "reveal": "never"
+            }
+        },
+        {
+            "type": "npm",
+            "script": "compile-tests",
+            "group": "build",
+            "label": "npm: compile-tests",
+            "presentation": {
+                "reveal": "never"
+            }
+        },
 		{
             "label": "watch",
             "dependsOn": [
