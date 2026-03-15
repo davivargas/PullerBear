@@ -300,7 +300,14 @@ export async function runAIAnalysis(
         });
 
         // Extract AI summary text from OpenRouter response
-        const summaryText: string = parseAIResponse(analysis);
+        let summaryText: string = "AI summary unavailable.";
+        try {
+            const parsedAnalysis = JSON.parse(analysis);
+            summaryText = parseAIResponse(parsedAnalysis);
+        } catch (parseError) {
+            console.error('[PullerBear] Failed to parse AI response:', parseError);
+            console.log('[PullerBear] Raw analysis:', analysis);
+        }
 
         const summary = createCommitSummary(targetRef, behindCount, summaryText, targetSha);
         writeToFile(summary);

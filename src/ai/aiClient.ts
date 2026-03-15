@@ -31,7 +31,7 @@ export async function analyzeCode(context: diffContext): Promise<any> {
   }
 
   const data = await response.json();
-  return data;
+  return data.choices?.[0]?.message?.content ?? '';
 }
 
 

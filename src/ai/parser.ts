@@ -6,8 +6,8 @@ interface AIResponse {
 }
 
 export function parseAIResponse(response: AIResponse[]): string {
-    if (response.length === 0) {
-        return "Error generating a summary.";
+    if (!Array.isArray(response) || response.length === 0) {
+        return "No issues or summaries found.";
     }
 
     console.log(response);
@@ -16,7 +16,7 @@ export function parseAIResponse(response: AIResponse[]): string {
         if (item.severity === "error" || item.severity === "warning") {
             summary += `File: ${item.file}\nLine: ${item.line}\nSeverity: ${item.severity}\n${item.summary}\n\n`;
         } else {
-            summary += `File: ${item.file}\n${item.summary}\n\n`;
+            summary += `File: ${item.file}\nSummary: ${item.summary}\n\n`;
         }
     });
     return summary;
