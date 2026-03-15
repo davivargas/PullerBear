@@ -15,8 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // Start the git monitor (fetch + summarize + notify)
-    const { refresh } = gitMonitor(context, provider);
-    provider.setRefreshCallback(refresh);
+    gitMonitor(context, provider);
 }
 
 export function deactivate() {}

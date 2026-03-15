@@ -12,13 +12,8 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
 
     private _view?: vscode.WebviewView;
     private _summaries: CommitSummary[] = [];
-    private _refreshCallback?: () => void;
 
     constructor(private readonly _extensionUri: vscode.Uri) {}
-
-    public setRefreshCallback(callback: () => void) {
-        this._refreshCallback = callback;
-    }
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -39,23 +34,26 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
             if (data.type === 'ready') {
                 // Send current summaries on load
                 this._pushSummaries();
-            } else if (data.type === 'reload') {
-                // Refresh summaries
-                if (this._refreshCallback) {
-                    this._refreshCallback();
-                }
-                // Also push current summaries (though refresh might trigger more)
-                this._pushSummaries();
             }
         });
     }
 
     /**
      * Adds a new commit summary and pushes it to the webview.
+     * Only adds the summary if a commit with the same hash isn't already present.
      */
+    /**
+     * Returns true if a summary with the given hash already exists.
+     */
+    public hasSummary(hash: string): boolean {
+        return this._summaries.some(s => s.hash === hash);
+    }
+
     public addSummary(summary: CommitSummary) {
-        this._summaries.unshift(summary); // newest first
-        this._pushSummaries();
+        if (!this.hasSummary(summary.hash)) {
+            this._summaries.unshift(summary); // newest first
+            this._pushSummaries();
+        }
     }
 
     private _pushSummaries() {

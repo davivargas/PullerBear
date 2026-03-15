@@ -100,15 +100,23 @@ export function gitMonitor(
     const git = gitExtension.exports.getAPI(1);
     const repoStates = createRepoStateMap();
 
+    const initRepo = (repository: any) => {
+        if (isRepositoryMonitored(repoStates, repository))
+        {
+            return;
+        }
+        initializeRepositoryMonitor(repository, repoStates, provider, context);
+    };
+
     // Listen for new repositories being opened
     git.onDidOpenRepository((repository: any) =>
     {
-        initializeRepositoryMonitor(repository, repoStates, provider, context);
+        initRepo(repository);
     });
 
     // Also check repositories that are already open
     for (const repo of git.repositories)
     {
-        initializeRepositoryMonitor(repo, repoStates, provider, context);
+        initRepo(repo);
     }
 }
