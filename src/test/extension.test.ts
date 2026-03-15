@@ -1,15 +1,57 @@
-import * as assert from 'assert';
-
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
+import * as assert from 'assert/strict';
 import * as vscode from 'vscode';
-// import * as myExtension from '../../extension';
+import * as extension from '../extension';
+import * as gitMonitorModule from '../gitTools/gitMonitor';
+import { ExplainerViewProvider } from '../ExplainerViewProvider';
+import { createDisposable, stubMethod } from './helpers/testUtils';
+import { createExtensionContext } from './helpers/factories';
 
-suite('Extension Test Suite', () => {
-	vscode.window.showInformationMessage('Start all tests.');
+suite('extension activation', () =>
+{
+    test('activate registers the sidebar provider and starts monitoring', () =>
+    {
+        const registrations: Array<{ viewType: string; provider: unknown }> = [];
+        const monitorCalls: Array<{ context: vscode.ExtensionContext; provider: unknown }> = [];
 
-	test('Sample test', () => {
-		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
-		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
-	});
+        const restoreRegister = stubMethod(
+            vscode.window,
+            'registerWebviewViewProvider',
+            ((viewType: string, provider: unknown) =>
+            {
+                registrations.push({ viewType, provider });
+                return createDisposable();
+            }) as typeof vscode.window.registerWebviewViewProvider
+        );
+        const restoreMonitor = stubMethod(
+            gitMonitorModule,
+            'gitMonitor',
+            ((context: vscode.ExtensionContext, provider: unknown) =>
+            {
+                monitorCalls.push({ context, provider });
+            }) as typeof gitMonitorModule.gitMonitor
+        );
+
+        try
+        {
+            const context = createExtensionContext();
+            extension.activate(context);
+
+            assert.equal(registrations.length, 1);
+            assert.equal(registrations[0].viewType, ExplainerViewProvider.viewType);
+            assert.equal(monitorCalls.length, 1);
+            assert.equal(monitorCalls[0].context, context);
+            assert.equal(monitorCalls[0].provider, registrations[0].provider);
+            assert.equal(context.subscriptions.length, 1);
+        }
+        finally
+        {
+            restoreMonitor();
+            restoreRegister();
+        }
+    });
+
+    test('deactivate is a no-op', () =>
+    {
+        assert.equal(extension.deactivate(), undefined);
+    });
 });
