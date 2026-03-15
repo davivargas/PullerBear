@@ -24,12 +24,12 @@ PullerBear is a VS Code extension that watches your Git remote, summarizes incom
 1. Package the extension:
    - `npm install`
    - `npx vsce package`
-  Note: If see **WARNING LICENSE, LICENSE.md, or LICENSE.txt not found**, please answer **y** to continue.
-2. Download the packaged link to your local device. 
-2. In VS Code, open Extensions view.
-3. Click `...` (top-right) → **Install from VSIX...**
-4. Select the downloaded `.vsix` file.
-5. In the left side bar, go to to the bottom and click `...`, then look for **PullerBear** and click it.
+     Note: If see **WARNING LICENSE, LICENSE.md, or LICENSE.txt not found**, please answer **y** to continue.
+2. Download the packaged link to your local device.
+3. In VS Code, open Extensions view.
+4. Click `...` (top-right) → **Install from VSIX...**
+5. Select the downloaded `.vsix` file.
+6. In the left side bar, go to to the bottom and click `...`, then look for **PullerBear** and click it.
 
 ## Quick start
 
@@ -44,16 +44,16 @@ PullerBear is a VS Code extension that watches your Git remote, summarizes incom
 
 ## Extension settings
 
-Configure in **Settings** (`Ctrl+,`), by searching `PullerBear` in extensions section, or in `settings.json`.
+Configure in **Settings** (`Ctrl + ,`), by searching `PullerBear` in extensions section, or in `settings.json`.
 
 | Setting                              | Type     |  Default | Description                                                                       |
-| ------------------------------------ | -------- | -------: | --------------------------------------------------------------------------------- |A.                                 |
+| ------------------------------------ | -------- | -------: | --------------------------------------------------------------------------------- |
 | `pullerBear.fetchIntervalMinutes`    | `number` |     `10` | How often PullerBear checks for remote updates.                                   |
 | `pullerBear.commitWindowMinutes`     | `number` |     `60` | Time window used to measure incoming commit volume.                               |
 | `pullerBear.warningCommitThreshold`  | `number` |      `2` | Shows a warning prompt above this commit volume.                                  |
 | `pullerBear.hardStopCommitThreshold` | `number` |      `5` | Stops summarization at/above this commit volume.                                  |
 | `pullerBear.branchRef`               | `string` | `"main"` | Target remote branch to compare against (e.g. `main`, `upstream`, `origin/main`). |
-| `pullerBear.apiKey`                  | `string` |     `""` | OpenRouter API key used for AI summarization/Q&
+| `pullerBear.apiKey`                  | `string` |     `""` | OpenRouter API key used for AI summarization/Q&A.                                 |
 
 ### Example `settings.json`
 
