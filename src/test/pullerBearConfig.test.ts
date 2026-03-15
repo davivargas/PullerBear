@@ -40,15 +40,17 @@ suite('pullerBearConfig', () =>
                 commitWindowMinutes     : 90,
                 warningCommitThreshold  : 4,
                 hardStopCommitThreshold : 8,
-                branchRef               : 'develop'
+                branchRef               : 'develop',
+                apiKey                  : undefined
             });
 
             assert.deepEqual(getCalls, [
-                ['fetchIntervalMinutes', 5],
+                ['fetchIntervalMinutes', 1],
                 ['commitWindowMinutes', 60],
                 ['warningCommitThreshold', 2],
                 ['hardStopCommitThreshold', 5],
-                ['branchRef', 'main']
+                ['branchRef', 'main'],
+                ['apiKey', '']
             ]);
         }
         finally

@@ -59,4 +59,16 @@ suite('commitTracker', () =>
             newCommits     : 0
         });
     });
+
+    test('addNewCommitTimestamps ignores non-positive commit counts', () =>
+    {
+        const state = { commitTimestamps: [1, 2] };
+
+        withFixedDateNow(123456789, () =>
+        {
+            addNewCommitTimestamps(state, 0);
+        });
+
+        assert.deepEqual(state.commitTimestamps, [1, 2]);
+    });
 });

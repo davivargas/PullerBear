@@ -83,4 +83,38 @@ suite('ExplainerViewProvider', () =>
         assert.equal(latestPush.data[0].hash, 'second');
         assert.equal(latestPush.data[1].hash, 'first');
     });
+
+    test('hasSummary tracks stored hashes and addSummary ignores duplicates', () =>
+    {
+        const postedMessages: any[] = [];
+        const webview = {
+            options             : undefined,
+            html                : '',
+            asWebviewUri        : (uri: vscode.Uri): vscode.Uri => uri,
+            postMessage         : async (message: any): Promise<boolean> =>
+            {
+                postedMessages.push(message);
+                return true;
+            },
+            onDidReceiveMessage : (_listener: (data: any) => void) =>
+                ({ dispose: () => undefined })
+        } as unknown as vscode.Webview;
+
+        const provider = new ExplainerViewProvider(vscode.Uri.file('/tmp/pullerbear'));
+        provider.resolveWebviewView(
+            { webview } as vscode.WebviewView,
+            {} as vscode.WebviewViewResolveContext,
+            {} as vscode.CancellationToken
+        );
+
+        const summary = createCommitSummary({ hash: 'dup-hash' });
+        provider.addSummary(summary);
+        provider.addSummary(summary);
+
+        assert.equal(provider.hasSummary('dup-hash'), true);
+        assert.equal(provider.hasSummary('missing-hash'), false);
+        assert.equal(postedMessages.length, 1);
+        assert.equal(postedMessages[0].data.length, 1);
+        assert.equal(postedMessages[0].data[0].hash, 'dup-hash');
+    });
 });

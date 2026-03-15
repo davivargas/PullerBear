@@ -1,7 +1,8 @@
 import * as assert from 'assert/strict';
 import * as vscode from 'vscode';
+import * as aiClient from '../ai/aiClient';
+import * as fileWrite from '../utl/fileWrite';
 import * as configModule from '../config/pullerBearConfig';
-import * as gitState from '../gitTools/gitState';
 import * as repositoryChecker from '../gitTools/repositoryChecker';
 import { ExplainerViewProvider } from '../ExplainerViewProvider';
 import { createRepoMonitorState, createRepository } from './helpers/factories';
@@ -14,32 +15,54 @@ suite('repositoryChecker checkRepository', () =>
         fetchIntervalMinutes    : 5,
         hardStopCommitThreshold : 5,
         warningCommitThreshold  : 2,
-        branchRef               : 'main'
+        branchRef               : 'main',
+        apiKey                  : ''
     };
 
-    test('returns immediately when a check is already in progress', async () =>
+    function createProvider(overrides: Partial<ExplainerViewProvider> = {}): ExplainerViewProvider
     {
+        return {
+            addSummary    : (): void => undefined,
+            clearSummaries: (): void => undefined,
+            hasSummary    : (): boolean => false,
+            ...overrides
+        } as unknown as ExplainerViewProvider;
+    }
+
+    test('returns immediately when a check is already queued', async () =>
+    {
+        let resolveQueue: (() => void) | undefined;
+        const checkQueue = new Promise<void>((resolve) =>
+        {
+            resolveQueue = resolve;
+        });
         const repository = createRepository({
             fetch: async (): Promise<void> =>
             {
-                assert.fail('fetch should not run when the repo is already being checked');
+                assert.fail('fetch should not run when a check is already queued');
             }
         });
-        const state = createRepoMonitorState({ isChecking: true });
-        const provider = {
-            addSummary: (_summary: any): void =>
-            {
-                assert.fail('provider should not be called');
-            }
-        } as ExplainerViewProvider;
+        const state = createRepoMonitorState({ checkQueue });
 
-        await repositoryChecker.checkRepository(repository, state, provider);
-        assert.equal(state.isChecking, true);
+        try
+        {
+            await repositoryChecker.checkRepository(repository, state, createProvider());
+
+            assert.equal(state.checkQueue, checkQueue);
+            assert.equal(state.isChecking, false);
+        }
+        finally
+        {
+            resolveQueue?.();
+        }
     });
 
-    test('shows up-to-date message and exits when behind count is zero', async () =>
+    test('shows manual caught-up message and exits when upstream is not behind', async () =>
     {
-        const repository = createRepository({ fetch: async (): Promise<void> => undefined });
+        const repository = createRepository({
+            fetch    : async (): Promise<void> => undefined,
+            getBranch: async (): Promise<{ commit: string }> => ({ commit: 'origin-main-1' })
+        });
         const state = createRepoMonitorState({ lastBehindCount: 0 });
         const infoMessages: string[] = [];
 
@@ -47,11 +70,6 @@ suite('repositoryChecker checkRepository', () =>
             configModule,
             'getPullerBearConfig',
             (() => baseConfig) as typeof configModule.getPullerBearConfig
-        );
-        const restoreBehind = stubMethod(
-            gitState,
-            'getConfiguredBranchBehindCount',
-            (() => 0) as typeof gitState.getConfiguredBranchBehindCount
         );
         const restoreInfo = stubMethod(
             vscode.window,
@@ -65,25 +83,33 @@ suite('repositoryChecker checkRepository', () =>
 
         try
         {
-            await repositoryChecker.checkRepository(repository, state, {
-                addSummary: (): void => undefined
-            } as unknown as ExplainerViewProvider);
+            await repositoryChecker.checkRepository(repository, state, createProvider(), true);
 
             assert.equal(state.isChecking, false);
             assert.equal(infoMessages.length, 1);
-            assert.match(infoMessages[0], /up to date/i);
+            assert.match(infoMessages[0], /all caught up/i);
         }
         finally
         {
             restoreInfo();
-            restoreBehind();
             restoreConfig();
         }
     });
 
     test('stops at hard threshold and does not summarize', async () =>
     {
-        const repository = createRepository();
+        const repository = createRepository({
+            fetch    : async (): Promise<void> => undefined,
+            getBranch: async (): Promise<{ commit: string }> => ({ commit: 'origin-main-1' }),
+            state    : {
+                HEAD : {
+                    commit   : 'head-commit',
+                    name     : 'feature/test',
+                    behind   : 1,
+                    upstream : { remote: 'origin', name: 'main' }
+                }
+            }
+        });
         const state = createRepoMonitorState({
             lastBehindCount  : 0,
             commitTimestamps : [Date.now(), Date.now(), Date.now(), Date.now()]
@@ -96,11 +122,6 @@ suite('repositoryChecker checkRepository', () =>
             'getPullerBearConfig',
             (() => baseConfig) as typeof configModule.getPullerBearConfig
         );
-        const restoreBehind = stubMethod(
-            gitState,
-            'getConfiguredBranchBehindCount',
-            (() => 1) as typeof gitState.getConfiguredBranchBehindCount
-        );
         const restoreWarn = stubMethod(
             vscode.window,
             'showWarningMessage',
@@ -110,23 +131,15 @@ suite('repositoryChecker checkRepository', () =>
                 return Promise.resolve(undefined);
             }) as typeof vscode.window.showWarningMessage
         );
-        const restoreRunAi = stubMethod(
-            repositoryChecker,
-            'runAIAnalysis',
-            (async () =>
-            {
-                assert.fail('AI analysis should not run after hard stop');
-            }) as typeof repositoryChecker.runAIAnalysis
-        );
 
         try
         {
-            await repositoryChecker.checkRepository(repository, state, {
+            await repositoryChecker.checkRepository(repository, state, createProvider({
                 addSummary: (): void =>
                 {
                     addSummaryCalls += 1;
                 }
-            } as unknown as ExplainerViewProvider);
+            }));
 
             assert.equal(addSummaryCalls, 0);
             assert.equal(state.isChecking, false);
@@ -135,18 +148,27 @@ suite('repositoryChecker checkRepository', () =>
         }
         finally
         {
-            restoreRunAi();
             restoreWarn();
-            restoreBehind();
             restoreConfig();
         }
     });
 
     test('respects warning cancellation and stops before AI analysis', async () =>
     {
-        const repository = createRepository();
+        const repository = createRepository({
+            fetch    : async (): Promise<void> => undefined,
+            getBranch: async (): Promise<{ commit: string }> => ({ commit: 'origin-main-1' }),
+            state    : {
+                HEAD : {
+                    commit   : 'head-commit',
+                    name     : 'feature/test',
+                    behind   : 3,
+                    upstream : { remote: 'origin', name: 'main' }
+                }
+            }
+        });
         const state = createRepoMonitorState({
-            lastBehindCount  : 0,
+            lastBehindCount  : 2,
             commitTimestamps : [Date.now(), Date.now()]
         });
 
@@ -154,11 +176,6 @@ suite('repositoryChecker checkRepository', () =>
             configModule,
             'getPullerBearConfig',
             (() => baseConfig) as typeof configModule.getPullerBearConfig
-        );
-        const restoreBehind = stubMethod(
-            gitState,
-            'getConfiguredBranchBehindCount',
-            (() => 1) as typeof gitState.getConfiguredBranchBehindCount
         );
         const restoreWarn = stubMethod(
             vscode.window,
@@ -173,31 +190,21 @@ suite('repositoryChecker checkRepository', () =>
                 return Promise.resolve(undefined);
             }) as typeof vscode.window.showWarningMessage
         );
-        const restoreRunAi = stubMethod(
-            repositoryChecker,
-            'runAIAnalysis',
-            (async () =>
-            {
-                assert.fail('AI analysis should not run when the warning is cancelled');
-            }) as typeof repositoryChecker.runAIAnalysis
-        );
 
         try
         {
-            await repositoryChecker.checkRepository(repository, state, {
+            await repositoryChecker.checkRepository(repository, state, createProvider({
                 addSummary: (): void =>
                 {
                     assert.fail('summary should not be added');
                 }
-            } as unknown as ExplainerViewProvider);
+            }));
 
             assert.equal(state.isChecking, false);
         }
         finally
         {
-            restoreRunAi();
             restoreWarn();
-            restoreBehind();
             restoreConfig();
         }
     });
@@ -205,16 +212,21 @@ suite('repositoryChecker checkRepository', () =>
     test('summarizes and pushes results when remote changes pass thresholds', async () =>
     {
         const repository = createRepository({
-            state: {
+            fetch    : async (): Promise<void> => undefined,
+            getBranch: async (ref: string): Promise<{ commit: string }> =>
+            {
+                assert.equal(ref, 'origin/main');
+                return { commit: 'remote-commit-3' };
+            },
+            diffWith : async (): Promise<string> => '+ const safe = true;',
+            state    : {
                 HEAD : {
                     commit   : 'head-commit',
                     name     : 'feature/test',
-                    behind   : 0,
+                    behind   : 3,
                     upstream : { remote: 'origin', name: 'main' }
-                },
-                refs : new Map<string, { behind?: number }>()
-            },
-            fetch: async (): Promise<void> => undefined
+                }
+            }
         });
         const state = createRepoMonitorState({ lastBehindCount: 1 });
         const infoMessages: string[] = [];
@@ -225,11 +237,6 @@ suite('repositoryChecker checkRepository', () =>
             'getPullerBearConfig',
             (() => baseConfig) as typeof configModule.getPullerBearConfig
         );
-        const restoreBehind = stubMethod(
-            gitState,
-            'getConfiguredBranchBehindCount',
-            (() => 3) as typeof gitState.getConfiguredBranchBehindCount
-        );
         const restoreInfo = stubMethod(
             vscode.window,
             'showInformationMessage',
@@ -239,62 +246,91 @@ suite('repositoryChecker checkRepository', () =>
                 return Promise.resolve(undefined);
             }) as typeof vscode.window.showInformationMessage
         );
-        const restoreWarn = stubMethod(
-            vscode.window,
-            'showWarningMessage',
-            ((message: string, ...items: any[]) =>
+        const restoreAnalyze = stubMethod(
+            aiClient,
+            'analyzeCode',
+            (async (context) =>
             {
-                if (items.some((item) => item === 'Continue'))
-                {
-                    return Promise.resolve('Continue');
-                }
-
-                return Promise.resolve(undefined);
-            }) as typeof vscode.window.showWarningMessage
-        );
-        const restoreRunAi = stubMethod(
-            repositoryChecker,
-            'runAIAnalysis',
-            (async (_repo, head) =>
-            {
-                assert.equal(head.name, 'main');
-                assert.equal(head.behind, 3);
+                assert.equal(context.branchName, 'feature/test');
+                assert.match(context.diffText, /safe = true/);
                 return {
-                    hash      : 'summary-1',
-                    message   : '3 new commit(s) on origin/main',
-                    summary   : 'AI says pull now.',
-                    timestamp : 100
+                    choices: [
+                        {
+                            message: { content: 'AI says pull now.' }
+                        }
+                    ]
                 };
-            }) as typeof repositoryChecker.runAIAnalysis
+            }) as typeof aiClient.analyzeCode
+        );
+        const restoreWrite = stubMethod(
+            fileWrite,
+            'writeToFile',
+            ((_: unknown): void => undefined) as typeof fileWrite.writeToFile
         );
 
         try
         {
-            await repositoryChecker.checkRepository(repository, state, {
+            await repositoryChecker.checkRepository(repository, state, createProvider({
                 addSummary: (summary): void =>
                 {
                     summaries.push(summary);
                 }
-            } as ExplainerViewProvider);
+            }));
 
             assert.equal(state.lastBehindCount, 3);
             assert.equal(state.commitTimestamps.length, 2);
             assert.equal(summaries.length, 1);
-            assert.equal(summaries[0].hash, 'summary-1');
+            assert.equal(summaries[0].hash, 'remote-commit-3');
+            assert.equal(summaries[0].summary, 'AI says pull now.');
             assert.equal(state.isChecking, false);
             assert.equal(infoMessages.some((message) => /behind by 3/.test(message)), true);
         }
         finally
         {
-            restoreRunAi();
-            restoreWarn();
+            restoreWrite();
+            restoreAnalyze();
             restoreInfo();
-            restoreBehind();
             restoreConfig();
         }
     });
 
-    test('shows an error when repository checking fails unexpectedly', async () =>
+    test('skips summarizing when the provider already has the target summary', async () =>
+    {
+        const repository = createRepository({
+            fetch    : async (): Promise<void> => undefined,
+            getBranch: async (): Promise<{ commit: string }> => ({ commit: 'remote-commit-3' })
+        });
+        let addSummaryCalls = 0;
+
+        const restoreConfig = stubMethod(
+            configModule,
+            'getPullerBearConfig',
+            (() => baseConfig) as typeof configModule.getPullerBearConfig
+        );
+
+        try
+        {
+            await repositoryChecker.checkRepository(repository, createRepoMonitorState(), createProvider({
+                hasSummary: (hash: string): boolean =>
+                {
+                    assert.equal(hash, 'remote-commit-3');
+                    return true;
+                },
+                addSummary: (): void =>
+                {
+                    addSummaryCalls += 1;
+                }
+            }), true);
+
+            assert.equal(addSummaryCalls, 0);
+        }
+        finally
+        {
+            restoreConfig();
+        }
+    });
+
+    test('shows a warning when fetch fails unexpectedly', async () =>
     {
         const repository = createRepository({
             fetch: async (): Promise<void> =>
@@ -303,36 +339,34 @@ suite('repositoryChecker checkRepository', () =>
             }
         });
         const state = createRepoMonitorState();
-        const errors: string[] = [];
+        const warnings: string[] = [];
 
         const restoreConfig = stubMethod(
             configModule,
             'getPullerBearConfig',
             (() => baseConfig) as typeof configModule.getPullerBearConfig
         );
-        const restoreError = stubMethod(
+        const restoreWarning = stubMethod(
             vscode.window,
-            'showErrorMessage',
+            'showWarningMessage',
             ((message: string) =>
             {
-                errors.push(message);
+                warnings.push(message);
                 return Promise.resolve(undefined);
-            }) as typeof vscode.window.showErrorMessage
+            }) as typeof vscode.window.showWarningMessage
         );
 
         try
         {
-            await repositoryChecker.checkRepository(repository, state, {
-                addSummary: (): void => undefined
-            } as unknown as ExplainerViewProvider);
+            await repositoryChecker.checkRepository(repository, state, createProvider());
 
-            assert.equal(errors.length, 1);
-            assert.match(errors[0], /Error fetching repository/);
+            assert.equal(warnings.length, 1);
+            assert.match(warnings[0], /failed to fetch/i);
             assert.equal(state.isChecking, false);
         }
         finally
         {
-            restoreError();
+            restoreWarning();
             restoreConfig();
         }
     });

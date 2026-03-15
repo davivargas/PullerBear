@@ -61,4 +61,23 @@ suite('stateManager', () =>
             ['two', 'four']
         );
     });
+
+    test('markCommitAsExplained does not update state for an existing hash', async () =>
+    {
+        let updateCalls = 0;
+        const context = createExtensionContext({
+            workspaceState: {
+                get    : <T>(_key: string): T | undefined => ['same'] as T,
+                update : async (): Promise<void> =>
+                {
+                    updateCalls += 1;
+                },
+                keys   : (): readonly string[] => []
+            } as unknown as vscode.Memento
+        });
+
+        await markCommitAsExplained(context, 'same');
+
+        assert.equal(updateCalls, 0);
+    });
 });

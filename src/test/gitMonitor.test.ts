@@ -49,11 +49,36 @@ suite('gitMonitor', () =>
 
     test('initializes monitors for open repositories and for repositories opened later', () =>
     {
-        const repositoryA = createRepository();
-        const repositoryB = createRepository();
+        const stateEmitterA = createEventEmitter<void>();
+        const stateEmitterB = createEventEmitter<void>();
+        const repositoryA = createRepository({
+            state: {
+                HEAD        : {
+                    commit   : 'head-a',
+                    name     : 'feature/a',
+                    behind   : 0,
+                    upstream : { remote: 'origin', name: 'main' }
+                },
+                refs        : new Map<string, { behind?: number }>(),
+                onDidChange : stateEmitterA.event
+            }
+        });
+        const repositoryB = createRepository({
+            state: {
+                HEAD        : {
+                    commit   : 'head-b',
+                    name     : 'feature/b',
+                    behind   : 0,
+                    upstream : { remote: 'origin', name: 'main' }
+                },
+                refs        : new Map<string, { behind?: number }>(),
+                onDidChange : stateEmitterB.event
+            }
+        });
         const openEmitter = createEventEmitter<any>();
         const configEmitter = createEventEmitter<vscode.ConfigurationChangeEvent>();
         const intervalCalls: Array<{ delay: number; fn: () => void }> = [];
+        const timeoutCalls: Array<() => void> = [];
         const checkCalls: any[] = [];
 
         const restoreGitExtension = stubMethod(
@@ -100,6 +125,8 @@ suite('gitMonitor', () =>
 
         const originalSetInterval = globalThis.setInterval;
         const originalClearInterval = globalThis.clearInterval;
+        const originalSetTimeout = globalThis.setTimeout;
+        const originalClearTimeout = globalThis.clearTimeout;
 
         globalThis.setInterval = (((fn: () => void, delay?: number): NodeJS.Timeout =>
         {
@@ -110,13 +137,22 @@ suite('gitMonitor', () =>
         globalThis.clearInterval =
             (((_handle: NodeJS.Timeout): void => undefined) as typeof clearInterval);
 
+        globalThis.setTimeout = (((fn: () => void): NodeJS.Timeout =>
+        {
+            timeoutCalls.push(fn);
+            return createDisposable() as unknown as NodeJS.Timeout;
+        }) as typeof setTimeout);
+
+        globalThis.clearTimeout =
+            (((_handle: NodeJS.Timeout): void => undefined) as typeof clearTimeout);
+
         try
         {
             const context = createExtensionContext();
 
             gitMonitor(
                 context,
-                { addSummary: (): void => undefined } as any
+                { addSummary: (): void => undefined, clearSummaries: (): void => undefined } as any
             );
 
             assert.equal(checkCalls.length, 1);
@@ -132,6 +168,9 @@ suite('gitMonitor', () =>
                 affectsConfiguration: (section: string): boolean => section === 'pullerbear'
             } as vscode.ConfigurationChangeEvent);
 
+            assert.equal(timeoutCalls.length, 2);
+            timeoutCalls[0]();
+            timeoutCalls[1]();
             assert.equal(checkCalls.length, 4);
 
             repositoryA.__close();
@@ -140,6 +179,8 @@ suite('gitMonitor', () =>
         }
         finally
         {
+            globalThis.clearTimeout = originalClearTimeout;
+            globalThis.setTimeout = originalSetTimeout;
             globalThis.clearInterval = originalClearInterval;
             globalThis.setInterval = originalSetInterval;
             restoreCheck();

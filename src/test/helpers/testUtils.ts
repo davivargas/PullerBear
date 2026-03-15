@@ -38,6 +38,32 @@ export function stubMethod<T extends object, K extends keyof T>(
     };
 }
 
+export function stubProperty<T extends object, K extends keyof T>(
+    target: T,
+    key: K,
+    value: T[K]
+): () => void
+{
+    const descriptor = Object.getOwnPropertyDescriptor(target, key);
+
+    Object.defineProperty(target, key, {
+        configurable : true,
+        enumerable   : descriptor?.enumerable ?? true,
+        get          : (): T[K] => value
+    });
+
+    return (): void =>
+    {
+        if (descriptor)
+        {
+            Object.defineProperty(target, key, descriptor);
+            return;
+        }
+
+        delete target[key];
+    };
+}
+
 export function stubGlobal<K extends keyof typeof globalThis>(
     key: K,
     replacement: (typeof globalThis)[K]

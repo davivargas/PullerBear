@@ -10,9 +10,9 @@ suite('repositoryChecker runAIAnalysis', () =>
     test('returns a commit summary using AI response content when available', async () =>
     {
         const repository = createRepository({
-            diff: async (range: string): Promise<string> =>
+            diffWith : async (range: string): Promise<string> =>
             {
-                assert.equal(range, 'origin/main...HEAD');
+                assert.equal(range, 'HEAD...origin/main');
                 return '+ const safe = true;';
             }
         });
@@ -43,7 +43,7 @@ suite('repositoryChecker runAIAnalysis', () =>
         const restoreWrite = stubMethod(
             fileWrite,
             'writeToFile',
-            (async (summary): Promise<void> =>
+            ((summary): void =>
             {
                 writes.push(summary);
             }) as typeof fileWrite.writeToFile
@@ -51,12 +51,12 @@ suite('repositoryChecker runAIAnalysis', () =>
 
         try
         {
-            const summary = await runAIAnalysis(repository, head);
+            const summary = await runAIAnalysis(repository, head, 'origin/main', 'target-commit', 2);
 
-            assert.equal(summary?.hash, 'commit-123');
+            assert.equal(summary?.hash, 'target-commit');
             assert.equal(summary?.summary, 'AI review result');
             assert.equal(writes.length, 1);
-            assert.equal(writes[0].hash, 'commit-123');
+            assert.equal(writes[0].hash, 'target-commit');
         }
         finally
         {
@@ -84,9 +84,9 @@ suite('repositoryChecker runAIAnalysis', () =>
                 commit   : 'commit-404',
                 upstream : { remote: 'origin', name: 'main' },
                 behind   : 4
-            });
+            }, 'origin/main', 'target-404', 4);
 
-            assert.equal(summary?.hash, 'commit-404');
+            assert.equal(summary?.hash, 'target-404');
             assert.match(String(summary?.summary), /AI summary unavailable/);
         }
         finally
