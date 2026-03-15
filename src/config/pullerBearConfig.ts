@@ -6,6 +6,7 @@ export interface PullerBearConfig
     commitWindowMinutes       : number;
     warningCommitThreshold    : number;
     hardStopCommitThreshold   : number;
+    apiKey                    : string;
 }
 
 export function getPullerBearConfig(): PullerBearConfig
@@ -16,6 +17,7 @@ export function getPullerBearConfig(): PullerBearConfig
         fetchIntervalMinutes    : config.get<number>('fetchIntervalMinutes', 1),
         commitWindowMinutes     : config.get<number>('commitWindowMinutes', 60),
         warningCommitThreshold  : config.get<number>('warningCommitThreshold', 2),
-        hardStopCommitThreshold : config.get<number>('hardStopCommitThreshold', 5)
+        hardStopCommitThreshold : config.get<number>('hardStopCommitThreshold', 5),
+        apiKey                  : config.get<string>('apiKey', '')
     };
 }

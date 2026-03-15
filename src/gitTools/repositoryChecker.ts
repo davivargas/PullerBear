@@ -145,15 +145,18 @@ export const createCommitSummaryObject = (
 /**
  * Creates a fallback commit summary when AI fails
  */
-export function createFallbackSummary(head: any, behindCount: number, upstreamSha: string): CommitSummary
+export function createFallbackSummary(head: any, behindCount: number, upstreamSha: string, error?: string): CommitSummary
 {
     const dedupKey = upstreamSha;
+    const errorMessage = error?.includes('API key not configured')
+        ? 'Please set pullerBear.apiKey in VS Code settings to enable AI summaries.'
+        : 'AI summary unavailable.';
+    
     return {
         hash        : dedupKey,
         message     : `${behindCount} new commit(s) on ` +
                       `${head.upstream.remote}/${head.upstream.name}`,
-        summary     : `You are ${behindCount} commit(s) behind. ` +
-                      `AI summary unavailable.`,
+        summary     : `You are ${behindCount} commit(s) behind. ${errorMessage}`,
         timestamp   : Date.now()
     };
 }
@@ -190,8 +193,9 @@ export async function runAIAnalysis(
     catch (aiError)
     {
         console.error('[PullerBear] AI analysis failed:', aiError);
+        const errorMessage = aiError instanceof Error ? aiError.message : String(aiError);
         const behindCount = head.behind ?? 0;
-        return createFallbackSummary(head, behindCount, upstreamSha);
+        return createFallbackSummary(head, behindCount, upstreamSha, errorMessage);
     }
 }
 

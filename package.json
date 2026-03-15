@@ -40,6 +40,36 @@
       ]
     }
   },
+  "configuration": {
+    "title": "PullerBear",
+    "properties": {
+      "pullerBear.apiKey": {
+        "type": "string",
+        "default": "",
+        "description": "OpenRouter API key for AI summarization. Get one at https://openrouter.ai/settings/keys"
+      },
+      "pullerBear.fetchIntervalMinutes": {
+        "type": "number",
+        "default": 1,
+        "description": "How often to check for new commits (in minutes)"
+      },
+      "pullerBear.commitWindowMinutes": {
+        "type": "number",
+        "default": 60,
+        "description": "Time window to track commit frequency (in minutes)"
+      },
+      "pullerBear.warningCommitThreshold": {
+        "type": "number",
+        "default": 2,
+        "description": "Show warning when commits exceed this threshold"
+      },
+      "pullerBear.hardStopCommitThreshold": {
+        "type": "number",
+        "default": 5,
+        "description": "Stop AI summarization when commits exceed this threshold"
+      }
+    }
+  },
   "scripts": {
     "vscode:prepublish": "npm run package",
     "compile": "npm run check-types && npm run lint && node esbuild.js",
