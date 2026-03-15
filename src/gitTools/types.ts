@@ -8,6 +8,7 @@ export interface RepoMonitorState
     lastHeadCommit?  : string;
     intervalHandle?  : NodeJS.Timeout;
     isChecking       : boolean;
+    checkQueue?      : Promise<void>;
 }
 
 export interface GitMonitorConfig
@@ -32,6 +33,7 @@ export interface CheckResult
     newCommits     : number;
 }
 
-export { CommitSummary };
-export { ExplainerViewProvider };
-export { vscode };
+// Re-exports removed - import directly from source modules
+// Import CommitSummary from '../ExplainerViewProvider'
+// Import ExplainerViewProvider from '../ExplainerViewProvider'
+// Import vscode from 'vscode'

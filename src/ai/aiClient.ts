@@ -23,6 +23,7 @@ export async function analyzeCode(context: diffContext): Promise<any> {
       model: 'google/gemini-3.1-flash-lite-preview',
       messages: prompt,
     }),
+    signal: AbortSignal.timeout(30000),
   });
 
   if (!response.ok) {

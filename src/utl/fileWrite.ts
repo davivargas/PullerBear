@@ -1,5 +1,4 @@
-import * as fs from 'fs';
-import { vscode } from '../gitTools/types';
+import * as vscode from 'vscode';
 
 export async function writeToFile(reviews: any) : Promise<void>
 {
