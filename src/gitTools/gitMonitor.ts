@@ -56,12 +56,17 @@ function initializeRepositoryMonitor(
     // Start the monitor
     startMonitor(repository, state, checkFn);
 
-    // Handle configuration changes
+    // Debounce configuration changes to avoid rapid restarts
+    let configChangeTimeout: NodeJS.Timeout | undefined;
     const configChangeDisposable = vscode.workspace.onDidChangeConfiguration((event) =>
     {
         if (event.affectsConfiguration('pullerbear'))
         {
-            startMonitor(repository, state, checkFn);
+            clearTimeout(configChangeTimeout);
+            configChangeTimeout = setTimeout(() =>
+            {
+                startMonitor(repository, state, checkFn);
+            }, 500);
         }
     });
 
