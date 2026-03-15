@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { analyzeCode } from '../ai/aiClient';
+import { parseAIResponse } from '../ai/parser';
 import { ExplainerViewProvider, CommitSummary } from '../ExplainerViewProvider';
 import { getPullerBearConfig } from '../config/pullerBearConfig';
 import { RepoMonitorState, GitMonitorConfig } from './types';
@@ -326,10 +327,22 @@ export async function runAIAnalysis(
             diffText
         });
 
-        // Extract AI summary text from OpenRouter response
-        const summaryText =
-            analysis?.choices?.[0]?.message?.content ??
-            JSON.stringify(analysis);
+        // Parse the AI response and format it
+        let parsedAnalysis = [];
+        try {
+            // Sometimes the AI returns markdown or extra text, try to extract the JSON array
+            const jsonMatch = typeof analysis === 'string' ? analysis.match(/\[[\s\S]*\]/) : null;
+            if (jsonMatch) {
+                parsedAnalysis = JSON.parse(jsonMatch[0]);
+            } else {
+                parsedAnalysis = JSON.parse(analysis);
+            }
+        } catch (e) {
+            console.error('[PullerBear] Failed to parse AI JSON:', e);
+            // Fallback to raw string if parsing fails
+        }
+
+        const summaryText = parsedAnalysis.length > 0 ? parseAIResponse(parsedAnalysis) : (typeof analysis === 'string' ? analysis : JSON.stringify(analysis));
 
         const summary = createCommitSummary(targetRef, behindCount, summaryText, targetSha);
         writeToFile(summary);

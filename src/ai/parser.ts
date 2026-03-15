@@ -14,7 +14,7 @@ export function parseAIResponse(response: AIResponse[]): string {
     let summary = "";
     response.forEach(item => {
         if (item.severity === "error" || item.severity === "warning") {
-            summary += `File: ${item.file}\nLine: ${item.line}\nSeverity: ${item.severity}\n${item.summary}\n\n`;
+            summary += `File: ${item.file}\nSeverity: ${item.severity}\nLine: ${item.line}\nSummary: ${item.summary}\n\n`;
         } else if (item.severity === "info") {
             summary += `File: ${item.file}\nSummary: ${item.summary}\n\n`;
         }
