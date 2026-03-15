@@ -4,6 +4,7 @@ import { getPullerBearConfig } from '../config/pullerBearConfig';
 import { RepoMonitorState } from './types';
 import { createRepoState, createRepoStateMap, isRepositoryMonitored, setMonitorInterval, clearMonitorInterval } from './gitState';
 import { checkRepository } from './repositoryChecker';
+import { clearReviewFile } from '../utl/fileWrite';
 
 /**
  * Starts the monitoring interval for a repository
@@ -78,6 +79,7 @@ function initializeRepositoryMonitor(
                     `Behind count: ${state.lastBehindCount} → ${currentBehind}`
                 );
                 provider.clearSummaries();
+                void clearReviewFile();
                 vscode.window.showInformationMessage(
                     '🐻‍❄️ PullerBear: Pull detected! Summaries cleared.'
                 );

@@ -1,5 +1,51 @@
 import * as vscode from 'vscode';
 
+/**
+ * Returns the URI for the pullerBear_reviews.json file in the first workspace folder.
+ */
+function getReviewFileUri(): vscode.Uri | undefined {
+    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+        return undefined;
+    }
+    const workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
+    return vscode.Uri.file(`${workspacePath}/pullerBear_reviews.json`);
+}
+
+/**
+ * Clears the pullerBear_reviews.json file by resetting it to an empty array.
+ */
+export async function clearReviewFile(): Promise<void> {
+    const fileUri = getReviewFileUri();
+    if (!fileUri) {
+        return;
+    }
+
+    try {
+        const emptyData = new TextEncoder().encode('[]');
+        await vscode.workspace.fs.writeFile(fileUri, emptyData);
+        console.log('[PullerBear] Cleared pullerBear_reviews.json');
+    } catch (error) {
+        console.error('[PullerBear] Failed to clear reviews file:', error);
+    }
+}
+
+/**
+ * Reads and returns the contents of pullerBear_reviews.json as a string.
+ */
+export async function readReviewFile(): Promise<string> {
+    const fileUri = getReviewFileUri();
+    if (!fileUri) {
+        return '[]';
+    }
+
+    try {
+        const fileData = await vscode.workspace.fs.readFile(fileUri);
+        return new TextDecoder().decode(fileData);
+    } catch {
+        return '[]';
+    }
+}
+
 export async function writeToFile(reviews: any) : Promise<void>
 {
     if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0)

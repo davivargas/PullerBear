@@ -16,6 +16,37 @@ export function buildPrompt(context: diffContext): { role: string; content: stri
     ];
 }
 
+export interface QAContext {
+    question: string;
+    reviewJson: string;
+}
+
+export function buildQAPrompt(context: QAContext): { role: string; content: string }[] {
+    return [
+        {
+            role: 'system',
+            content: getQASystemPrompt()
+        },
+        {
+            role: 'user',
+            content: `Here is the commit review data:\n\n${context.reviewJson}\n\nUser question: ${context.question}`
+        }
+    ];
+}
+
+function getQASystemPrompt(): string {
+    return `You are a helpful assistant for the PullerBear VS Code extension.
+You have access to a JSON array of commit review data. Each object in the array contains:
+- "file": the file that was changed
+- "line": the line number of the change
+- "severity": "error", "warning", or "info"
+- "summary": a description of the change or issue
+
+Your job is to answer the user's question about these commits clearly and concisely.
+Base your answer strictly on the provided review data. If the data does not contain enough information to answer the question, say so.
+Keep responses short and developer-friendly. Do not use markdown formatting.`;
+}
+
 function getSystemPrompt(): string {
     return `You are an expert senior software engineer performing a code review.
             Your task is to analyze the provided Git diff for bugs, security vulnerabilities,

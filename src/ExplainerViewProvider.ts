@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { askAboutCommit } from './ai/aiClient';
+import { readReviewFile } from './utl/fileWrite';
 
 export interface CommitSummary {
     hash: string;
@@ -30,10 +32,32 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
         // Handle messages from the webview
-        webviewView.webview.onDidReceiveMessage(data => {
+        webviewView.webview.onDidReceiveMessage(async (data) => {
             if (data.type === 'ready') {
                 // Send current summaries on load
                 this._pushSummaries();
+            }
+            if (data.type === 'askQuestion') {
+                const question = data.question;
+                if (!question || typeof question !== 'string') {
+                    return;
+                }
+
+                try {
+                    const reviewJson = await readReviewFile();
+                    const answer = await askAboutCommit(question, reviewJson);
+                    webviewView.webview.postMessage({
+                        type: 'answerQuestion',
+                        answer,
+                    });
+                } catch (error) {
+                    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+                    console.error('[PullerBear] Q&A failed:', error);
+                    webviewView.webview.postMessage({
+                        type: 'answerQuestion',
+                        answer: `Error: ${errorMsg}`,
+                    });
+                }
             }
         });
     }

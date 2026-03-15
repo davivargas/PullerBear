@@ -1,10 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 interface CommitSummary {
     hash: string;
     message: string;
     summary: string;
     timestamp: number;
+}
+
+interface ChatMessage {
+    role: 'user' | 'assistant';
+    text: string;
 }
 
 // Acquire VS Code API for postMessage communication
@@ -17,6 +22,10 @@ const vscode = acquireVsCodeApi();
 
 export function App() {
     const [summaries, setSummaries] = useState<CommitSummary[]>([]);
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+    const [inputValue, setInputValue] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const chatEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         // Tell the extension we are ready to receive data
@@ -27,10 +36,36 @@ export function App() {
             if (msg.type === 'summaries') {
                 setSummaries(msg.data);
             }
+            if (msg.type === 'answerQuestion') {
+                setIsLoading(false);
+                setChatMessages(prev => [...prev, { role: 'assistant', text: msg.answer }]);
+            }
         };
         window.addEventListener('message', handler);
         return () => window.removeEventListener('message', handler);
     }, []);
+
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [chatMessages]);
+
+    const handleSend = () => {
+        const question = inputValue.trim();
+        if (!question || isLoading) {
+            return;
+        }
+        setChatMessages(prev => [...prev, { role: 'user', text: question }]);
+        setInputValue('');
+        setIsLoading(true);
+        vscode.postMessage({ type: 'askQuestion', question });
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
+    };
 
     return (
         <div style={styles.container}>
@@ -65,18 +100,62 @@ export function App() {
                         ))}
                     </ul>
                 )}
+
+                {/* Chat Section */}
+                <div style={styles.chatSection}>
+                    <h2 style={styles.chatTitle}>Ask about commits</h2>
+                    <div style={styles.chatMessages}>
+                        {chatMessages.length === 0 && (
+                            <div style={styles.chatPlaceholder}>
+                                Ask a question about the recent commits...
+                            </div>
+                        )}
+                        {chatMessages.map((msg, i) => (
+                            <div
+                                key={i}
+                                style={{
+                                    ...styles.chatBubble,
+                                    ...(msg.role === 'user' ? styles.userBubble : styles.assistantBubble),
+                                }}
+                            >
+                                <span style={styles.chatRole}>
+                                    {msg.role === 'user' ? 'You' : '🐻‍❄️ PullerBear'}
+                                </span>
+                                <span style={styles.chatText}>{msg.text}</span>
+                            </div>
+                        ))}
+                        {isLoading && (
+                            <div style={{ ...styles.chatBubble, ...styles.assistantBubble }}>
+                                <span style={styles.chatRole}>🐻‍❄️ PullerBear</span>
+                                <span style={styles.chatText}>Thinking...</span>
+                            </div>
+                        )}
+                        <div ref={chatEndRef} />
+                    </div>
+                </div>
             </div>
 
-{/* Input functionality reserved for future implementation
             <div style={styles.inputContainer}>
                 <input
                     type="text"
-                    placeholder="Ask a question about the commits"
+                    placeholder="Ask about the commits..."
                     style={styles.input}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={isLoading}
                 />
-                <button style={styles.button}>Send</button>
+                <button
+                    style={{
+                        ...styles.button,
+                        ...(isLoading || !inputValue.trim() ? styles.buttonDisabled : {}),
+                    }}
+                    onClick={handleSend}
+                    disabled={isLoading || !inputValue.trim()}
+                >
+                    {isLoading ? '...' : 'Send'}
+                </button>
             </div>
-            */}
         </div>
     );
 }
@@ -221,6 +300,64 @@ const styles: Record<string, React.CSSProperties> = {
         cursor: 'pointer',
         borderRadius: '2px',
         fontWeight: 600,
-    }
+    },
+    buttonDisabled: {
+        opacity: 0.5,
+        cursor: 'not-allowed',
+    },
+    chatSection: {
+        marginTop: '20px',
+        borderTop: '1px solid var(--vscode-panel-border)',
+        paddingTop: '12px',
+    },
+    chatTitle: {
+        margin: '0 0 8px 0',
+        fontSize: '13px',
+        fontWeight: 600,
+        color: 'var(--vscode-foreground)',
+    },
+    chatMessages: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        maxHeight: '300px',
+        overflowY: 'auto',
+    },
+    chatPlaceholder: {
+        color: 'var(--vscode-descriptionForeground)',
+        fontSize: '12px',
+        fontStyle: 'italic',
+    },
+    chatBubble: {
+        padding: '8px 10px',
+        borderRadius: '6px',
+        fontSize: '12px',
+        lineHeight: 1.5,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '2px',
+    } as React.CSSProperties,
+    userBubble: {
+        background: 'var(--vscode-button-background)',
+        color: 'var(--vscode-button-foreground)',
+        alignSelf: 'flex-end',
+        maxWidth: '85%',
+    },
+    assistantBubble: {
+        background: 'var(--vscode-editor-background)',
+        border: '1px solid var(--vscode-panel-border)',
+        color: 'var(--vscode-foreground)',
+        alignSelf: 'flex-start',
+        maxWidth: '85%',
+    },
+    chatRole: {
+        fontSize: '10px',
+        fontWeight: 700,
+        opacity: 0.7,
+    },
+    chatText: {
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+    } as React.CSSProperties,
 };
 
