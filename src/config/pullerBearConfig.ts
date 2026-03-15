@@ -1,8 +1,4 @@
 import * as vscode from 'vscode';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
 export interface PullerBearConfig
 {
     fetchIntervalMinutes      : number;
