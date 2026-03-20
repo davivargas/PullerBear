@@ -19,7 +19,7 @@ export async function analyzeCode(context: diffContext): Promise<any> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemini-3.1-flash-lite-preview',
+      model: 'openrouter/free',
       messages: prompt,
     }),
     signal: AbortSignal.timeout(30000),
@@ -51,7 +51,7 @@ export async function askAboutCommit(question: string, reviewJson: string): Prom
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemini-3.1-flash-lite-preview',
+      model: 'openrouter/free',
       messages: prompt,
     }),
     signal: AbortSignal.timeout(30000),

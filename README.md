@@ -19,17 +19,23 @@ PullerBear is a VS Code extension that watches your Git remote, summarizes incom
 - Network access to `https://openrouter.ai`.
 - OpenRouter API key (set in `pullerBear.apiKey`).
 
+## IMPORTANT NOTE
+
+This application uses "openrouter/free" as default AI model from openrouter, but for better performance,
+you should use a more recent and capable model (have in mind that these are paid).
+
 ## Installation
 
-1. Package the extension:
+1. Paste your ApiKey into the pullerBearConfig.ts file now or set it on settings.json later (extension settings)
+2. Package the extension:
    - `npm install`
    - `npx vsce package`
      Note: If see **WARNING LICENSE, LICENSE.md, or LICENSE.txt not found**, please answer **y** to continue.
-2. Download the packaged link to your local device.
-3. In VS Code, open Extensions view.
-4. Click `...` (top-right) → **Install from VSIX...**
-5. Select the downloaded `.vsix` file.
-6. In the left side bar, go to to the bottom and click `...`, then look for **PullerBear** and click it.
+3. Download the packaged link to your local device.
+4. In VS Code, open Extensions view.
+5. Click `...` (top-right) → **Install from VSIX...**
+6. Select the downloaded `.vsix` file.
+7. In the left side bar, still on Extensions tab, look for **PullerBear** on search bar and click it.
 
 ## Quick start
 
@@ -38,9 +44,6 @@ PullerBear is a VS Code extension that watches your Git remote, summarizes incom
 3. In **What's New**, wait for automatic checks or click the reload icon.
 4. When remote commits are detected, read the generated summary cards.
 5. Use the chat box at the bottom to ask questions about the latest reviews.
-
-**Here is a lastest packaged of the extension for you to try out!**
-`C:\Users\tkngu\OneDrive\Documents\Canada\Hackathons\HackTheBreak2026\PullerBear\pullerbear-0.0.1.vsix`
 
 ## Extension settings
 
