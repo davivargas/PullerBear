@@ -180,4 +180,18 @@ suite('repositoryChecker helper functions', () =>
 
         assert.match(summary.summary, /pullerBear\.apiKey/);
     });
+
+    test('createFallbackSummary mentions OpenRouter billing details for 402 failures', () =>
+    {
+        const summary = repositoryChecker.createFallbackSummary(
+            {
+                upstream : { remote: 'origin', name: 'main' }
+            },
+            2,
+            'sha-402',
+            'OpenRouter error (402): Insufficient credits'
+        );
+
+        assert.match(summary.summary, /credit limit|configured model|OpenRouter rejected/i);
+    });
 });

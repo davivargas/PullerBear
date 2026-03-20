@@ -41,7 +41,8 @@ suite('pullerBearConfig', () =>
                 warningCommitThreshold  : 4,
                 hardStopCommitThreshold : 8,
                 branchRef               : 'develop',
-                apiKey                  : undefined
+                apiKey                  : undefined,
+                model                   : undefined
             });
 
             assert.deepEqual(getCalls, [
@@ -50,7 +51,8 @@ suite('pullerBearConfig', () =>
                 ['warningCommitThreshold', 2],
                 ['hardStopCommitThreshold', 5],
                 ['branchRef', 'main'],
-                ['apiKey', '']
+                ['apiKey', ''],
+                ['model', 'openrouter/free']
             ]);
         }
         finally

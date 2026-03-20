@@ -253,13 +253,7 @@ suite('repositoryChecker checkRepository', () =>
             {
                 assert.equal(context.branchName, 'feature/test');
                 assert.match(context.diffText, /safe = true/);
-                return {
-                    choices: [
-                        {
-                            message: { content: 'AI says pull now.' }
-                        }
-                    ]
-                };
+                return 'AI says pull now.';
             }) as typeof aiClient.analyzeCode
         );
         const restoreWrite = stubMethod(

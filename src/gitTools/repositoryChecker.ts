@@ -208,6 +208,8 @@ export function createFallbackSummary(head: any, behindCount: number, upstreamSh
     const dedupKey = upstreamSha;
     const errorMessage = error?.includes('API key not configured')
         ? 'Please set pullerBear.apiKey in VS Code settings to enable AI summaries.'
+        : error?.includes('OpenRouter error (402)')
+            ? 'OpenRouter rejected the request. Check your API key credit limit, credits, or configured model.'
         : 'AI summary unavailable.';
 
     const targetRef = resolveTargetBranchRef(head, getPullerBearConfig().branchRef);

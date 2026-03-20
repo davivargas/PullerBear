@@ -7,6 +7,7 @@ export interface PullerBearConfig
     hardStopCommitThreshold   : number;
     branchRef                 : string;
     apiKey                    : string;
+    model?                    : string;
 }
 
 export function getPullerBearConfig(): PullerBearConfig
@@ -19,6 +20,7 @@ export function getPullerBearConfig(): PullerBearConfig
         warningCommitThreshold  : config.get<number>('warningCommitThreshold', 2),
         hardStopCommitThreshold : config.get<number>('hardStopCommitThreshold', 5),
         branchRef               : config.get<string>('branchRef', 'main'),
-        apiKey                  : config.get<string>('apiKey', '')
+        apiKey                  : config.get<string>('apiKey', ''),
+        model                   : config.get<string>('model', 'openrouter/free')
     };
 }

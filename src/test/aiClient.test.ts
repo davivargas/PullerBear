@@ -78,6 +78,7 @@ suite('aiClient', () =>
             assert.match(fetchCalls[0].url, /openrouter/i);
             assert.match(String(fetchCalls[0].init?.headers && JSON.stringify(fetchCalls[0].init.headers)), /secret/);
             assert.match(String(fetchCalls[0].init?.body), /feature\/test/);
+            assert.match(String(fetchCalls[0].init?.body), /openrouter\/free/);
         }
         finally
         {
@@ -86,7 +87,7 @@ suite('aiClient', () =>
         }
     });
 
-    test('askAboutCommit throws on non-ok responses', async () =>
+    test('askAboutCommit surfaces OpenRouter error details for payment failures', async () =>
     {
         const restoreConfig = stubMethod(
             configModule,
@@ -106,7 +107,12 @@ suite('aiClient', () =>
             {
                 return {
                     ok     : false,
-                    status : 500
+                    status : 402,
+                    json   : async (): Promise<unknown> => ({
+                        error: {
+                            message: 'Insufficient credits'
+                        }
+                    })
                 } as Response;
             }) as typeof fetch
         );
@@ -115,7 +121,7 @@ suite('aiClient', () =>
         {
             await assert.rejects(
                 () => askAboutCommit('What changed?', '[{"file":"a.ts"}]'),
-                /HTTP error/
+                /Insufficient credits/
             );
         }
         finally

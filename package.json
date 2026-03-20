@@ -51,6 +51,11 @@
           "default": "",
           "description": "OpenRouter API key for AI summarization. Get one at https://openrouter.ai/settings/keys"
         },
+        "pullerBear.model": {
+          "type": "string",
+          "default": "openrouter/free",
+          "description": "OpenRouter model slug for summaries and chat. Example values: openrouter/free or nvidia/nemotron-3-super-120b-a12b:free"
+        },
         "pullerBear.fetchIntervalMinutes": {
           "type": "number",
           "default": 10,
