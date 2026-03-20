@@ -16,6 +16,29 @@ import { writeToFile } from '../utl/fileWrite';
 
 const execFileAsync = promisify(execFile);
 
+interface ReviewEntry
+{
+    file: string;
+    line: number;
+    severity: string;
+    summary: string;
+}
+
+function isReviewEntry(value: unknown): value is ReviewEntry
+{
+    if (!value || typeof value !== 'object')
+    {
+        return false;
+    }
+
+    const candidate = value as Partial<ReviewEntry>;
+
+    return typeof candidate.file === 'string' &&
+        typeof candidate.line === 'number' &&
+        typeof candidate.severity === 'string' &&
+        typeof candidate.summary === 'string';
+}
+
 /**
  * Checks if the repository has an upstream branch configured
  */
@@ -332,7 +355,7 @@ export async function runAIAnalysis(
         });
 
         // Parse the AI response and format it
-        let parsedAnalysis = [];
+        let parsedAnalysis: unknown = [];
         try {
             // Sometimes the AI returns markdown or extra text, try to extract the JSON array
             const jsonMatch = typeof analysis === 'string' ? analysis.match(/\[[\s\S]*\]/) : null;
@@ -346,10 +369,16 @@ export async function runAIAnalysis(
             // Fallback to raw string if parsing fails
         }
 
-        const summaryText = parsedAnalysis.length > 0 ? parseAIResponse(parsedAnalysis) : (typeof analysis === 'string' ? analysis : JSON.stringify(analysis));
+        const reviewEntries = Array.isArray(parsedAnalysis)
+            ? parsedAnalysis.filter(isReviewEntry)
+            : [];
+
+        const summaryText = reviewEntries.length > 0
+            ? parseAIResponse(reviewEntries)
+            : (typeof analysis === 'string' ? analysis : JSON.stringify(analysis));
 
         const summary = createCommitSummary(targetRef, behindCount, summaryText, targetSha);
-        writeToFile(summary);
+        await writeToFile(reviewEntries);
         return summary;
     }
     catch (aiError)

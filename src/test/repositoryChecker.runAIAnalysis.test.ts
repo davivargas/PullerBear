@@ -23,6 +23,7 @@ suite('repositoryChecker runAIAnalysis', () =>
             behind   : 2
         };
         const writes: any[] = [];
+        let writeCompleted = false;
 
         const restoreAnalyze = stubMethod(
             aiClient,
@@ -37,9 +38,10 @@ suite('repositoryChecker runAIAnalysis', () =>
         const restoreWrite = stubMethod(
             fileWrite,
             'writeToFile',
-            ((summary): void =>
+            (async (reviews): Promise<void> =>
             {
-                writes.push(summary);
+                writes.push(reviews);
+                writeCompleted = true;
             }) as typeof fileWrite.writeToFile
         );
 
@@ -50,7 +52,15 @@ suite('repositoryChecker runAIAnalysis', () =>
             assert.equal(summary?.hash, 'target-commit');
             assert.match(String(summary?.summary), /AI review result/);
             assert.equal(writes.length, 1);
-            assert.equal(writes[0].hash, 'target-commit');
+            assert.equal(writeCompleted, true);
+            assert.deepEqual(writes[0], [
+                {
+                    file     : 'src/a.ts',
+                    line     : 0,
+                    severity : 'info',
+                    summary  : 'AI review result'
+                }
+            ]);
         }
         finally
         {
