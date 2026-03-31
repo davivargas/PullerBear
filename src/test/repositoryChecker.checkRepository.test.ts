@@ -22,9 +22,13 @@ suite('repositoryChecker checkRepository', () =>
     function createProvider(overrides: Partial<ExplainerViewProvider> = {}): ExplainerViewProvider
     {
         return {
-            addSummary    : (): void => undefined,
-            clearSummaries: (): void => undefined,
-            hasSummary    : (): boolean => false,
+            addSummary        : (): void => undefined,
+            upsertSummary     : (): void => undefined,
+            clearSummaries    : (): void => undefined,
+            hasSummary        : (): boolean => false,
+            getSummary        : (): any => undefined,
+            registerRetryAction: (): void => undefined,
+            clearRetryAction  : (): void => undefined,
             ...overrides
         } as unknown as ExplainerViewProvider;
     }

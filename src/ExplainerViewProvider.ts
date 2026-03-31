@@ -7,6 +7,11 @@ export interface CommitSummary {
     message: string;
     summary: string;
     timestamp: number;
+    status?: 'success' | 'error';
+    errorKind?: string;
+    retriable?: boolean;
+    retryTargetRef?: string;
+    retryBehindCount?: number;
 }
 
 export class ExplainerViewProvider implements vscode.WebviewViewProvider {
@@ -17,6 +22,7 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private _summaries: CommitSummary[] = [];
     private _refreshHandler?: () => Promise<void>;
+    private _retryActions = new Map<string, () => Promise<void>>();
     private _isLoading = false;
     private _loadingText = ExplainerViewProvider.defaultLoadingMessage;
 
@@ -60,6 +66,18 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
                     this.setLoadingState(false);
                 }
             }
+            if (data.type === 'retrySummary') {
+                const hash = typeof data.hash === 'string' ? data.hash : '';
+                const summary = hash ? this.getSummary(hash) : undefined;
+                const retryAction = hash ? this._retryActions.get(hash) : undefined;
+
+                if (!summary || !summary.retriable || !retryAction)
+                {
+                    return;
+                }
+
+                await retryAction();
+            }
             if (data.type === 'askQuestion') {
                 const question = data.question;
                 if (!question || typeof question !== 'string') {
@@ -99,8 +117,45 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
     public addSummary(summary: CommitSummary) {
         if (!this.hasSummary(summary.hash)) {
             this._summaries.unshift(summary); // newest first
+            if (!summary.retriable)
+            {
+                this._retryActions.delete(summary.hash);
+            }
             this._pushSummaries();
         }
+    }
+
+    public upsertSummary(summary: CommitSummary): void
+    {
+        const index = this._summaries.findIndex((item) => item.hash === summary.hash);
+        if (index >= 0)
+        {
+            this._summaries[index] = summary;
+        }
+        else
+        {
+            this._summaries.unshift(summary);
+        }
+        if (!summary.retriable)
+        {
+            this._retryActions.delete(summary.hash);
+        }
+        this._pushSummaries();
+    }
+
+    public getSummary(hash: string): CommitSummary | undefined
+    {
+        return this._summaries.find((summary) => summary.hash === hash);
+    }
+
+    public registerRetryAction(hash: string, action: () => Promise<void>): void
+    {
+        this._retryActions.set(hash, action);
+    }
+
+    public clearRetryAction(hash: string): void
+    {
+        this._retryActions.delete(hash);
     }
 
     /**
@@ -110,6 +165,7 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
      */
     public clearSummaries() {
         this._summaries = [];
+        this._retryActions.clear();
         this._pushSummaries();
     }
 

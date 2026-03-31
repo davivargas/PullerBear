@@ -198,6 +198,55 @@ suite('ExplainerViewProvider', () =>
         assert.equal(loadingMessages[loadingMessages.length - 1].loading, false);
     });
 
+    test('retrySummary invokes retry action only for retriable error summaries', async () =>
+    {
+        let messageHandler: ((data: any) => void | Promise<void>) | undefined;
+        let retryCalls = 0;
+        const webview = {
+            options             : undefined,
+            html                : '',
+            asWebviewUri        : (uri: vscode.Uri): vscode.Uri => uri,
+            postMessage         : async (): Promise<boolean> => true,
+            onDidReceiveMessage : (listener: (data: any) => void | Promise<void>) =>
+            {
+                messageHandler = listener;
+                return { dispose: () => undefined };
+            }
+        } as unknown as vscode.Webview;
+
+        const provider = new ExplainerViewProvider(vscode.Uri.file('/tmp/pullerbear'));
+        provider.resolveWebviewView(
+            { webview } as vscode.WebviewView,
+            {} as vscode.WebviewViewResolveContext,
+            {} as vscode.CancellationToken
+        );
+
+        provider.addSummary(createCommitSummary({
+            hash      : 'retryable',
+            status    : 'error',
+            retriable : true
+        }));
+        provider.registerRetryAction('retryable', async (): Promise<void> =>
+        {
+            retryCalls += 1;
+        });
+
+        provider.addSummary(createCommitSummary({
+            hash      : 'non-retryable',
+            status    : 'error',
+            retriable : false
+        }));
+        provider.registerRetryAction('non-retryable', async (): Promise<void> =>
+        {
+            retryCalls += 10;
+        });
+
+        await messageHandler?.({ type: 'retrySummary', hash: 'retryable' });
+        await messageHandler?.({ type: 'retrySummary', hash: 'non-retryable' });
+
+        assert.equal(retryCalls, 1);
+    });
+
     test('askQuestion reads the review file and posts the AI answer', async () =>
     {
         const postedMessages: any[] = [];

@@ -108,13 +108,20 @@ suite('repositoryChecker helper functions', () =>
             hash      : 'target-123',
             message   : '2 new commit(s) on origin/main',
             summary   : 'AI text',
-            timestamp : 42
+            timestamp : 42,
+            status    : 'success',
+            retriable : false
         });
         assert.deepEqual(fallback, {
-            hash      : 'abc999',
-            message   : '5 new commit(s) on origin/main',
-            summary   : 'You are 5 commit(s) behind. AI summary unavailable because the request failed for an unknown reason.',
-            timestamp : 77
+            hash            : 'abc999',
+            message         : '5 new commit(s) on origin/main',
+            summary         : 'You are 5 commit(s) behind. AI summary unavailable because the request failed for an unknown reason.',
+            timestamp       : 77,
+            status          : 'error',
+            errorKind       : 'unknown',
+            retriable       : false,
+            retryTargetRef  : 'origin/main',
+            retryBehindCount: 5
         });
         assert.equal(await repositoryChecker.getTargetCommitHash(repository, 'origin/main'), 'remote-commit');
         assert.equal(repositoryChecker.exceedsHardStopThreshold(5, baseConfig), true);
@@ -177,7 +184,6 @@ suite('repositoryChecker helper functions', () =>
             'sha-1',
             'API key not configured. Please set pullerBear.apiKey in VS Code settings.'
         );
-
         const authFailure = repositoryChecker.createFallbackSummary(
             {
                 upstream : { remote: 'origin', name: 'main' }
@@ -207,5 +213,23 @@ suite('repositoryChecker helper functions', () =>
         assert.match(authFailure.summary, /rejected your API key/i);
         assert.match(networkFailure.summary, /could not reach OpenRouter/i);
         assert.match(timeoutFailure.summary, /request timed out/i);
+        assert.equal(missingKey.status, 'error');
+        assert.equal(missingKey.retriable, false);
+    });
+
+    test('createFallbackSummary marks retry metadata for retriable failures', () =>
+    {
+        const summary = repositoryChecker.createFallbackSummary(
+            {
+                upstream : { remote: 'origin', name: 'main' }
+            },
+            2,
+            'sha-1',
+            'OpenRouter rate limit reached. Try again in a moment.'
+        );
+
+        assert.equal(summary.status, 'error');
+        assert.equal(summary.errorKind, 'rate_limit');
+        assert.equal(summary.retriable, true);
     });
 });

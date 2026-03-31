@@ -24,6 +24,18 @@ interface ReviewEntry
     summary: string;
 }
 
+type SummaryErrorKind =
+    'rate_limit' |
+    'timeout' |
+    'temporary_unavailable' |
+    'network' |
+    'missing_api_key' |
+    'auth' |
+    'billing' |
+    'bad_request' |
+    'invalid_model' |
+    'unknown';
+
 function isReviewEntry(value: unknown): value is ReviewEntry
 {
     if (!value || typeof value !== 'object')
@@ -220,7 +232,9 @@ export const createCommitSummaryObject = (
     hash: commitHash,
     message: `${behindCount} new commit(s) on ${remoteName}/${branchName}`,
     summary: summaryText,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    status: 'success',
+    retriable: false
 });
 
 function getFriendlyAiErrorMessage(error?: string): string
@@ -283,6 +297,67 @@ function getFriendlyAiErrorMessage(error?: string): string
     return `AI summary unavailable because the AI request failed: ${error}`;
 }
 
+function getSummaryErrorKind(error?: string): SummaryErrorKind
+{
+    const normalized = (error ?? '').toLowerCase();
+    if (!normalized)
+    {
+        return 'unknown';
+    }
+    if (normalized.includes('rate limit') || normalized.includes('429'))
+    {
+        return 'rate_limit';
+    }
+    if (normalized.includes('timed out') || normalized.includes('timeout'))
+    {
+        return 'timeout';
+    }
+    if (normalized.includes('temporarily unavailable'))
+    {
+        return 'temporary_unavailable';
+    }
+    if (normalized.includes('could not reach openrouter') ||
+        normalized.includes('fetch failed') ||
+        normalized.includes('enotfound') ||
+        normalized.includes('econnrefused') ||
+        normalized.includes('econnreset') ||
+        normalized.includes('etimedout'))
+    {
+        return 'network';
+    }
+    if (normalized.includes('api key not configured'))
+    {
+        return 'missing_api_key';
+    }
+    if (normalized.includes('authentication failed') ||
+        normalized.includes('rejected your api key') ||
+        normalized.includes('rejected access'))
+    {
+        return 'auth';
+    }
+    if (normalized.includes('billing') || normalized.includes('credit'))
+    {
+        return 'billing';
+    }
+    if (normalized.includes('model was not found') || normalized.includes('invalid model'))
+    {
+        return 'invalid_model';
+    }
+    if (normalized.includes('invalid') || normalized.includes('bad request'))
+    {
+        return 'bad_request';
+    }
+    return 'unknown';
+}
+
+function isRetriableSummaryError(kind: SummaryErrorKind): boolean
+{
+    return kind === 'rate_limit' ||
+        kind === 'timeout' ||
+        kind === 'temporary_unavailable' ||
+        kind === 'network';
+}
+
 /**
  * Creates a fallback commit summary when AI fails
  */
@@ -290,6 +365,8 @@ export function createFallbackSummary(head: any, behindCount: number, upstreamSh
 {
     const dedupKey = upstreamSha;
     const errorMessage = getFriendlyAiErrorMessage(error);
+    const errorKind = getSummaryErrorKind(error);
+    const retriable = isRetriableSummaryError(errorKind);
 
     const targetRef = resolveTargetBranchRef(head, getPullerBearConfig().branchRef);
     const [remoteName, ...branchParts] = targetRef.split('/');
@@ -299,8 +376,83 @@ export function createFallbackSummary(head: any, behindCount: number, upstreamSh
         hash        : dedupKey,
         message     : `${behindCount} new commit(s) on ` + `${remoteName || 'origin'}/${branchName}`,
         summary     : `You are ${behindCount} commit(s) behind. ${errorMessage}`,
-        timestamp   : Date.now()
+        timestamp   : Date.now(),
+        status      : 'error',
+        errorKind,
+        retriable,
+        retryTargetRef : targetRef,
+        retryBehindCount : behindCount
     };
+}
+
+async function retrySummaryForHash(
+    repository: any,
+    state: RepoMonitorState,
+    provider: ExplainerViewProvider,
+    hash: string
+): Promise<void>
+{
+    const existing = provider.getSummary(hash);
+    if (!existing || !existing.retriable || existing.status !== 'error')
+    {
+        return;
+    }
+
+    if (state.isChecking)
+    {
+        vscode.window.showInformationMessage(
+            '🐻‍❄️ PullerBear: A repository check is already running. Please retry in a moment.'
+        );
+        return;
+    }
+
+    state.isChecking = true;
+    try
+    {
+        await repository.fetch();
+
+        const head = repository.state?.HEAD;
+        const targetRef = existing.retryTargetRef ?? resolveTargetBranchRef(head, getPullerBearConfig().branchRef);
+        const currentTargetSha = await getTargetCommitHash(repository, targetRef);
+
+        if (currentTargetSha !== hash)
+        {
+            provider.clearRetryAction(hash);
+            vscode.window.showInformationMessage(
+                '🐻‍❄️ PullerBear: Remote commits changed since this failed summary. Use Refresh commits for the latest range.'
+            );
+            return;
+        }
+
+        const behindCount = typeof existing.retryBehindCount === 'number'
+            ? existing.retryBehindCount
+            : (isCurrentUpstreamTarget(head, targetRef) ? (head?.behind ?? 0) : 1);
+
+        const summary = await runAIAnalysis(repository, head, targetRef, hash, behindCount);
+        if (!summary)
+        {
+            return;
+        }
+
+        provider.upsertSummary(summary);
+        if (summary.retriable)
+        {
+            provider.registerRetryAction(hash, async () =>
+                retrySummaryForHash(repository, state, provider, hash));
+            return;
+        }
+
+        provider.clearRetryAction(hash);
+    }
+    catch (error)
+    {
+        console.error('[PullerBear] Error retrying summary:', error);
+        vscode.window.showErrorMessage('PullerBear: Failed to retry summary.');
+    }
+    finally
+    {
+        state.isChecking = false;
+    }
 }
 
 /**
@@ -642,6 +794,15 @@ export async function checkRepository(
         if (summary)
         {
             provider.addSummary(summary);
+            if (summary.retriable)
+            {
+                provider.registerRetryAction(summary.hash, async () =>
+                    retrySummaryForHash(repository, state, provider, summary.hash));
+            }
+            else
+            {
+                provider.clearRetryAction(summary.hash);
+            }
         }
     }
     catch (error)

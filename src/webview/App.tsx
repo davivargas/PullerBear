@@ -5,6 +5,9 @@ interface CommitSummary {
     message: string;
     summary: string;
     timestamp: number;
+    status?: 'success' | 'error';
+    errorKind?: string;
+    retriable?: boolean;
 }
 
 interface ChatMessage {
@@ -133,6 +136,15 @@ export function App() {
                                     style={styles.summary}
                                     dangerouslySetInnerHTML={{ __html: markdownToHtml(s.summary) }}
                                 />
+                                {s.status === 'error' && s.retriable && (
+                                    <button
+                                        type="button"
+                                        style={styles.retryButton}
+                                        onClick={() => vscode.postMessage({ type: 'retrySummary', hash: s.hash })}
+                                    >
+                                        Retry summary
+                                    </button>
+                                )}
                             </li>
                         ))}
                     </ul>
@@ -342,6 +354,16 @@ const styles: Record<string, React.CSSProperties> = {
         fontSize: '12px',
         color: 'var(--vscode-descriptionForeground)',
         lineHeight: 1.6,
+    },
+    retryButton: {
+        marginTop: '8px',
+        background: 'var(--vscode-button-secondaryBackground)',
+        color: 'var(--vscode-button-secondaryForeground)',
+        border: '1px solid var(--vscode-panel-border)',
+        borderRadius: '4px',
+        padding: '4px 8px',
+        fontSize: '11px',
+        cursor: 'pointer',
     },
     inputContainer: {
         padding: '12px',
