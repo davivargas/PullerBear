@@ -61,8 +61,27 @@ function initializeRepositoryMonitor(
     const stateChangeDisposable = repository.state.onDidChange(() =>
     {
         const currentHead = repository.state?.HEAD;
+        const currentBranchName = currentHead?.name;
         const currentCommit = currentHead?.commit;
         const currentBehind = currentHead?.behind ?? 0;
+        const branchSwitched =
+            state.lastBranchName !== undefined &&
+            currentBranchName !== undefined &&
+            currentBranchName !== state.lastBranchName;
+
+        if (branchSwitched)
+        {
+            provider.clearSummaries();
+            void clearReviewFile();
+
+            state.commitTimestamps = [];
+            state.lastBranchName = currentBranchName;
+            state.lastHeadCommit = currentCommit;
+            state.lastBehindCount = currentBehind;
+
+            void checkFn(repository, state);
+            return;
+        }
 
         if (currentCommit && currentCommit !== state.lastHeadCommit)
         {
@@ -87,6 +106,11 @@ function initializeRepositoryMonitor(
 
             state.lastHeadCommit = currentCommit;
             state.lastBehindCount = currentBehind;
+        }
+
+        if (currentBranchName !== undefined)
+        {
+            state.lastBranchName = currentBranchName;
         }
     });
 

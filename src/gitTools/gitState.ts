@@ -9,6 +9,7 @@ export function createRepoState(repository: any): RepoMonitorState
         commitTimestamps : [],
         lastBehindCount  : repository.state?.HEAD?.behind ?? 0,
         lastHeadCommit   : repository.state?.HEAD?.commit,
+        lastBranchName   : repository.state?.HEAD?.name,
         isChecking       : false
     };
 }
