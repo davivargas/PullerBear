@@ -575,7 +575,16 @@ export async function checkRepository(
 
         // Run AI analysis and push results to the sidebar
         console.log(`[PullerBear] Running AI analysis with target ${targetRef} and sha ${targetSha}`);
-        const summary = await runAIAnalysis(repository, head, targetRef, targetSha, behindCount);
+        provider.setLoadingState?.(true, ExplainerViewProvider.defaultLoadingMessage);
+        let summary: CommitSummary | null = null;
+        try
+        {
+            summary = await runAIAnalysis(repository, head, targetRef, targetSha, behindCount);
+        }
+        finally
+        {
+            provider.setLoadingState?.(false);
+        }
 
         if (summary)
         {

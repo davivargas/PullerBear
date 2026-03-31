@@ -11,10 +11,14 @@ export interface CommitSummary {
 
 export class ExplainerViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'pullerbear.explainerView';
+    public static readonly defaultLoadingMessage =
+        'Reading diff and generating summary...';
 
     private _view?: vscode.WebviewView;
     private _summaries: CommitSummary[] = [];
     private _refreshHandler?: () => Promise<void>;
+    private _isLoading = false;
+    private _loadingText = ExplainerViewProvider.defaultLoadingMessage;
 
     constructor(private readonly _extensionUri: vscode.Uri) {}
 
@@ -41,11 +45,20 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
             if (data.type === 'ready') {
                 // Send current summaries on load
                 this._pushSummaries();
+                this._pushLoadingState();
                 return;
             }
 
             if (data.type === 'refresh') {
-                void this._refreshHandler?.();
+                this.setLoadingState(true, 'Refreshing commits...');
+                try
+                {
+                    await this._refreshHandler?.();
+                }
+                finally
+                {
+                    this.setLoadingState(false);
+                }
             }
             if (data.type === 'askQuestion') {
                 const question = data.question;
@@ -100,11 +113,34 @@ export class ExplainerViewProvider implements vscode.WebviewViewProvider {
         this._pushSummaries();
     }
 
+    public setLoadingState(
+        isLoading: boolean,
+        text: string = ExplainerViewProvider.defaultLoadingMessage
+    ): void
+    {
+        this._isLoading = isLoading;
+        if (isLoading)
+        {
+            this._loadingText = text;
+        }
+        this._pushLoadingState();
+    }
+
     private _pushSummaries() {
         if (this._view) {
             this._view.webview.postMessage({
                 type: 'summaries',
                 data: this._summaries,
+            });
+        }
+    }
+
+    private _pushLoadingState() {
+        if (this._view) {
+            this._view.webview.postMessage({
+                type: 'loadingState',
+                loading: this._isLoading,
+                text: this._loadingText,
             });
         }
     }
