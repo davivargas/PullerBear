@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import { diffContext } from "./promptBuilder";
 import { buildPrompt, buildQAPrompt, QAContext } from "./promptBuilder";
 import { getPullerBearConfig } from "../config/pullerBearConfig";
@@ -40,35 +41,76 @@ async function requestOpenRouter(messages: unknown): Promise<any>
     throw new Error('API key not configured. Please set pullerBear.apiKey in VS Code settings.');
   }
 
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: 'Bearer ' + apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'openrouter/free',
-        messages,
-      }),
-      signal: AbortSignal.timeout(30000),
-    });
+  const runRequest = async (
+    timeoutMs: number,
+    onSlowRequestAtMs?: number
+  ): Promise<any> =>
+  {
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort('timeout'), timeoutMs);
+    const slowRequestHandle = onSlowRequestAtMs
+      ? setTimeout(() =>
+        {
+          void vscode.window.showInformationMessage(
+            'PullerBear: AI summary is taking longer than expected. Still waiting...'
+          );
+        }, onSlowRequestAtMs)
+      : undefined;
 
-    if (!response.ok) {
-      throw new Error(describeOpenRouterStatus(response.status));
+    try
+    {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'openrouter/free',
+          messages,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(describeOpenRouterStatus(response.status));
+      }
+
+      const data = await response.json();
+      return data.choices?.[0]?.message?.content ?? '';
     }
+    finally
+    {
+      clearTimeout(timeoutHandle);
+      if (slowRequestHandle)
+      {
+        clearTimeout(slowRequestHandle);
+      }
+    }
+  };
 
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content ?? '';
+  try {
+    return await runRequest(30000);
   } catch (error) {
-    if (error instanceof Error) {
-      if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-        throw new Error('OpenRouter request timed out after 30 seconds.');
+    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+      void vscode.window.showInformationMessage(
+        'PullerBear: AI request timed out after 30 seconds. Retrying once and waiting longer before giving up.'
+      );
+      try
+      {
+        return await runRequest(5 * 60 * 1000, 2 * 60 * 1000);
       }
-
-      if (/fetch failed|network|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT/i.test(error.message)) {
-        throw new Error('Could not reach OpenRouter. Check your internet connection or firewall.');
+      catch (retryError)
+      {
+        if (retryError instanceof Error && (retryError.name === 'TimeoutError' || retryError.name === 'AbortError'))
+        {
+          throw new Error('OpenRouter request timed out after 5 minutes.');
+        }
+        throw retryError;
       }
+    }
+    if (error instanceof Error && /fetch failed|network|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT/i.test(error.message)) {
+      throw new Error('Could not reach OpenRouter. Check your internet connection or firewall.');
     }
 
     throw error;
