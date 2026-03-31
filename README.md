@@ -37,6 +37,8 @@ Important: PullerBear uses OpenRouter, so you should choose the model you want t
 
 ## Quick start
 
+Before you start: PullerBear reads the AI model from the extension setting `pullerBear.model`. We recommend leaving it on the default `openrouter/free` first, then switching to another OpenRouter model slug later if you want different speed, quality, or rate-limit behavior.
+
 1. Open a Git repository in VS Code.
 2. Open the PullerBear activity bar icon.
 3. In **What's New**, wait for automatic checks or click the reload icon.
@@ -47,15 +49,15 @@ Important: PullerBear uses OpenRouter, so you should choose the model you want t
 
 Configure in **Settings** (`Ctrl + ,`), by searching `PullerBear` in extensions section, or in `settings.json`.
 
-| Setting                              | Type     |  Default | Description                                                                       |
-| ------------------------------------ | -------- | -------: | --------------------------------------------------------------------------------- |
-| `pullerBear.fetchIntervalMinutes`    | `number` |     `10` | How often PullerBear checks for remote updates.                                   |
-| `pullerBear.commitWindowMinutes`     | `number` |     `60` | Time window used to measure incoming commit volume.                               |
-| `pullerBear.warningCommitThreshold`  | `number` |      `2` | Shows a warning prompt above this commit volume.                                  |
-| `pullerBear.hardStopCommitThreshold` | `number` |      `5` | Stops summarization at/above this commit volume.                                  |
-| `pullerBear.branchRef`               | `string` | `"main"` | Target remote branch to compare against (e.g. `main`, `upstream`, `origin/main`). |
-| `pullerBear.model`                   | `string` | `"openrouter/free"` | OpenRouter model slug used for summaries and chat.                      |
-| `pullerBear.apiKey`                  | `string` |     `""` | OpenRouter API key used for AI summarization/Q&A.                                 |
+| Setting                              | Type     |             Default | Description                                                                       |
+| ------------------------------------ | -------- | ------------------: | --------------------------------------------------------------------------------- |
+| `pullerBear.fetchIntervalMinutes`    | `number` |                `10` | How often PullerBear checks for remote updates.                                   |
+| `pullerBear.commitWindowMinutes`     | `number` |                `60` | Time window used to measure incoming commit volume.                               |
+| `pullerBear.warningCommitThreshold`  | `number` |                 `2` | Shows a warning prompt above this commit volume.                                  |
+| `pullerBear.hardStopCommitThreshold` | `number` |                 `5` | Stops summarization at/above this commit volume.                                  |
+| `pullerBear.branchRef`               | `string` |            `"main"` | Target remote branch to compare against (e.g. `main`, `upstream`, `origin/main`). |
+| `pullerBear.model`                   | `string` | `"openrouter/free"` | OpenRouter model slug used for summaries and chat.                                |
+| `pullerBear.apiKey`                  | `string` |                `""` | OpenRouter API key used for AI summarization/Q&A.                                 |
 
 ### Example `settings.json`
 
@@ -66,7 +68,7 @@ Configure in **Settings** (`Ctrl + ,`), by searching `PullerBear` in extensions 
   "pullerBear.warningCommitThreshold": 3,
   "pullerBear.hardStopCommitThreshold": 8,
   "pullerBear.branchRef": "main",
-  "pullerBear.model": "openai/gpt-4.1-mini",
+  "pullerBear.model": "openai/gpt-5.4",
   "pullerBear.apiKey": "sk-or-v1-..."
 }
 ```
