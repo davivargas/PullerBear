@@ -113,7 +113,7 @@ suite('repositoryChecker helper functions', () =>
         assert.deepEqual(fallback, {
             hash      : 'abc999',
             message   : '5 new commit(s) on origin/main',
-            summary   : 'You are 5 commit(s) behind. AI summary unavailable.',
+            summary   : 'You are 5 commit(s) behind. AI summary unavailable because the request failed for an unknown reason.',
             timestamp : 77
         });
         assert.equal(await repositoryChecker.getTargetCommitHash(repository, 'origin/main'), 'remote-commit');
@@ -167,9 +167,9 @@ suite('repositoryChecker helper functions', () =>
         );
     });
 
-    test('createFallbackSummary mentions API key setup when that is the failure', () =>
+    test('createFallbackSummary maps common AI failures to actionable messages', () =>
     {
-        const summary = repositoryChecker.createFallbackSummary(
+        const missingKey = repositoryChecker.createFallbackSummary(
             {
                 upstream : { remote: 'origin', name: 'main' }
             },
@@ -178,6 +178,34 @@ suite('repositoryChecker helper functions', () =>
             'API key not configured. Please set pullerBear.apiKey in VS Code settings.'
         );
 
-        assert.match(summary.summary, /pullerBear\.apiKey/);
+        const authFailure = repositoryChecker.createFallbackSummary(
+            {
+                upstream : { remote: 'origin', name: 'main' }
+            },
+            2,
+            'sha-2',
+            'OpenRouter authentication failed. Check pullerBear.apiKey.'
+        );
+        const networkFailure = repositoryChecker.createFallbackSummary(
+            {
+                upstream : { remote: 'origin', name: 'main' }
+            },
+            2,
+            'sha-3',
+            'Could not reach OpenRouter. Check your internet connection or firewall.'
+        );
+        const timeoutFailure = repositoryChecker.createFallbackSummary(
+            {
+                upstream : { remote: 'origin', name: 'main' }
+            },
+            2,
+            'sha-4',
+            'OpenRouter request timed out after 30 seconds.'
+        );
+
+        assert.match(missingKey.summary, /no API key is configured/i);
+        assert.match(authFailure.summary, /rejected your API key/i);
+        assert.match(networkFailure.summary, /could not reach OpenRouter/i);
+        assert.match(timeoutFailure.summary, /request timed out/i);
     });
 });
