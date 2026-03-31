@@ -7,13 +7,6 @@ function isTimeoutError(error: unknown): boolean
 {
   if (error === 'timeout') {
     return true;
-export async function analyzeCode(context: diffContext): Promise<any> {
-  const config = getPullerBearConfig();
-  const apiKey = config.apiKey;
-  const model = config.model || 'openrouter/free';
-
-  if (!apiKey) {
-    throw new Error('API key not configured. Please set pullerBear.apiKey in VS Code settings.');
   }
 
   if (error instanceof Error) {
@@ -22,18 +15,8 @@ export async function analyzeCode(context: diffContext): Promise<any> {
       /timed out|timeout/i.test(error.message);
   }
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: 'Bearer ' + apiKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages: prompt,
-    }),
-    signal: AbortSignal.timeout(30000),
-  });
+  return false;
+}
 
 function describeOpenRouterStatus(status: number): string
 {
@@ -99,7 +82,7 @@ async function requestOpenRouter(messages: unknown): Promise<any>
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'openrouter/free',
+          model,
           messages,
         }),
         signal: controller.signal,
@@ -121,18 +104,6 @@ async function requestOpenRouter(messages: unknown): Promise<any>
       }
     }
   };
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: 'Bearer ' + apiKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages: prompt,
-    }),
-    signal: AbortSignal.timeout(30000),
-  });
 
   try {
     return await runRequest(30000);
@@ -154,7 +125,9 @@ async function requestOpenRouter(messages: unknown): Promise<any>
         throw retryError;
       }
     }
-    if (error instanceof Error && /fetch failed|network|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT/i.test(error.message)) {
+
+    if (error instanceof Error &&
+      /fetch failed|network|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT/i.test(error.message)) {
       throw new Error('Could not reach OpenRouter. Check your internet connection or firewall.');
     }
 
