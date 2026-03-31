@@ -86,7 +86,7 @@ suite('aiClient', () =>
         }
     });
 
-    test('askAboutCommit throws on non-ok responses', async () =>
+    test('askAboutCommit throws a meaningful message on non-ok responses', async () =>
     {
         const restoreConfig = stubMethod(
             configModule,
@@ -115,7 +115,7 @@ suite('aiClient', () =>
         {
             await assert.rejects(
                 () => askAboutCommit('What changed?', '[{"file":"a.ts"}]'),
-                /HTTP error/
+                /temporarily unavailable/i
             );
         }
         finally

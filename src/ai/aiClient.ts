@@ -3,6 +3,21 @@ import { diffContext } from "./promptBuilder";
 import { buildPrompt, buildQAPrompt, QAContext } from "./promptBuilder";
 import { getPullerBearConfig } from "../config/pullerBearConfig";
 
+function isTimeoutError(error: unknown): boolean
+{
+  if (error === 'timeout') {
+    return true;
+  }
+
+  if (error instanceof Error) {
+    return error.name === 'TimeoutError' ||
+      error.name === 'AbortError' ||
+      /timed out|timeout/i.test(error.message);
+  }
+
+  return false;
+}
+
 function describeOpenRouterStatus(status: number): string
 {
   switch (status) {
@@ -47,7 +62,7 @@ async function requestOpenRouter(messages: unknown): Promise<any>
   ): Promise<any> =>
   {
     const controller = new AbortController();
-    const timeoutHandle = setTimeout(() => controller.abort('timeout'), timeoutMs);
+    const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
     const slowRequestHandle = onSlowRequestAtMs
       ? setTimeout(() =>
         {
@@ -92,7 +107,7 @@ async function requestOpenRouter(messages: unknown): Promise<any>
   try {
     return await runRequest(30000);
   } catch (error) {
-    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+    if (isTimeoutError(error)) {
       void vscode.window.showInformationMessage(
         'PullerBear: AI request timed out after 30 seconds. Retrying once and waiting longer before giving up.'
       );
@@ -102,7 +117,7 @@ async function requestOpenRouter(messages: unknown): Promise<any>
       }
       catch (retryError)
       {
-        if (retryError instanceof Error && (retryError.name === 'TimeoutError' || retryError.name === 'AbortError'))
+        if (isTimeoutError(retryError))
         {
           throw new Error('OpenRouter request timed out after 5 minutes.');
         }
