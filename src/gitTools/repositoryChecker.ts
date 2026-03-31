@@ -377,6 +377,54 @@ export async function getDiffFromGitCli(repository: any, range: string): Promise
     }
 }
 
+/**
+ * Counts commits reachable from the target ref but not from HEAD.
+ */
+export async function getCommitCountFromGitCli(repository: any, range: string): Promise<number | null>
+{
+    const cwd = repository?.rootUri?.fsPath;
+    if (!cwd || typeof cwd !== 'string')
+    {
+        return null;
+    }
+
+    try
+    {
+        const { stdout } = await execFileAsync(
+            'git',
+            ['rev-list', '--count', range],
+            { cwd, maxBuffer: 1024 * 1024 }
+        );
+        const parsed = Number.parseInt(typeof stdout === 'string' ? stdout.trim() : '', 10);
+
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+    catch (error)
+    {
+        console.warn('[PullerBear] git rev-list fallback failed:', error);
+        return null;
+    }
+}
+
+/**
+ * Resolves how many incoming commits exist for the configured target.
+ */
+export async function getIncomingCommitCount(
+    repository: any,
+    head: any,
+    targetRef: string,
+    isUpstreamTarget: boolean
+): Promise<number>
+{
+    if (isUpstreamTarget)
+    {
+        return head?.behind ?? 0;
+    }
+
+    const cliCount = await getCommitCountFromGitCli(repository, `HEAD..${targetRef}`);
+    return cliCount ?? 1;
+}
+
 /*
  * Runs AI analysis on the repository diff
 */
@@ -521,7 +569,12 @@ export async function checkRepository(
             return;
         }
 
-        const currentBehind = isUpstreamTarget ? (head?.behind ?? 0) : 1;
+        const currentBehind = await getIncomingCommitCount(
+            repository,
+            head,
+            targetRef,
+            isUpstreamTarget
+        );
         const newIncomingCommits = calculateNewCommits(currentBehind, state.lastBehindCount);
 
         state.lastBehindCount = currentBehind;
@@ -532,9 +585,9 @@ export async function checkRepository(
         // Get commits in window (also prunes old ones)
         const commitsInWindow = getCommitsInWindow(state.commitTimestamps, windowMs);
 
-        if (isUpstreamTarget && currentBehind <= 0)
+        if (currentBehind <= 0)
         {
-            console.log('[PullerBear] checkRepository skipped: upstream target not behind');
+            console.log('[PullerBear] checkRepository skipped: target has no incoming commits');
             if (isManual)
             {
                 vscode.window.showInformationMessage(

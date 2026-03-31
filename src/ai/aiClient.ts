@@ -7,6 +7,13 @@ function isTimeoutError(error: unknown): boolean
 {
   if (error === 'timeout') {
     return true;
+export async function analyzeCode(context: diffContext): Promise<any> {
+  const config = getPullerBearConfig();
+  const apiKey = config.apiKey;
+  const model = config.model || 'openrouter/free';
+
+  if (!apiKey) {
+    throw new Error('API key not configured. Please set pullerBear.apiKey in VS Code settings.');
   }
 
   if (error instanceof Error) {
@@ -15,8 +22,18 @@ function isTimeoutError(error: unknown): boolean
       /timed out|timeout/i.test(error.message);
   }
 
-  return false;
-}
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: prompt,
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
 
 function describeOpenRouterStatus(status: number): string
 {
@@ -51,6 +68,7 @@ async function requestOpenRouter(messages: unknown): Promise<any>
 {
   const config = getPullerBearConfig();
   const apiKey = config.apiKey;
+  const model = config.model || 'openrouter/free';
 
   if (!apiKey) {
     throw new Error('API key not configured. Please set pullerBear.apiKey in VS Code settings.');
@@ -103,6 +121,18 @@ async function requestOpenRouter(messages: unknown): Promise<any>
       }
     }
   };
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: prompt,
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
 
   try {
     return await runRequest(30000);

@@ -2,6 +2,8 @@
 
 PullerBear is a VS Code extension that watches your Git remote, summarizes incoming commits with AI, and gives you a chat interface to ask follow-up questions before you pull.
 
+Important: PullerBear uses OpenRouter, so you should choose the model you want to use and set both `pullerBear.apiKey` and `pullerBear.model` in VS Code settings. The default model is `openrouter/free`, but you can switch it to any OpenRouter model slug you prefer.
+
 ## What it does
 
 - Monitors your repository on an interval and fetches remote updates.
@@ -18,15 +20,11 @@ PullerBear is a VS Code extension that watches your Git remote, summarizes incom
 - Built-in Git extension enabled (`vscode.git`).
 - Network access to `https://openrouter.ai`.
 - OpenRouter API key (set in `pullerBear.apiKey`).
-
-## IMPORTANT NOTE
-
-This application uses "openrouter/free" as default AI model from openrouter, but for better performance,
-you should use a more recent and capable model (have in mind that these are paid).
+- OpenRouter model slug (set in `pullerBear.model` if you do not want the default).
 
 ## Installation
 
-1. Paste your ApiKey into the pullerBearConfig.ts file now or set it on settings.json later (extension settings)
+1. In VS Code settings, set `pullerBear.apiKey` to your OpenRouter key and optionally set `pullerBear.model` to the model slug you want to use.
 2. Package the extension:
    - `npm install`
    - `npx vsce package`
@@ -56,6 +54,7 @@ Configure in **Settings** (`Ctrl + ,`), by searching `PullerBear` in extensions 
 | `pullerBear.warningCommitThreshold`  | `number` |      `2` | Shows a warning prompt above this commit volume.                                  |
 | `pullerBear.hardStopCommitThreshold` | `number` |      `5` | Stops summarization at/above this commit volume.                                  |
 | `pullerBear.branchRef`               | `string` | `"main"` | Target remote branch to compare against (e.g. `main`, `upstream`, `origin/main`). |
+| `pullerBear.model`                   | `string` | `"openrouter/free"` | OpenRouter model slug used for summaries and chat.                      |
 | `pullerBear.apiKey`                  | `string` |     `""` | OpenRouter API key used for AI summarization/Q&A.                                 |
 
 ### Example `settings.json`
@@ -67,6 +66,7 @@ Configure in **Settings** (`Ctrl + ,`), by searching `PullerBear` in extensions 
   "pullerBear.warningCommitThreshold": 3,
   "pullerBear.hardStopCommitThreshold": 8,
   "pullerBear.branchRef": "main",
+  "pullerBear.model": "openai/gpt-4.1-mini",
   "pullerBear.apiKey": "sk-or-v1-..."
 }
 ```
