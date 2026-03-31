@@ -51,6 +51,11 @@
           "default": "",
           "description": "OpenRouter API key for AI summarization. Get one at https://openrouter.ai/settings/keys"
         },
+        "pullerBear.model": {
+          "type": "string",
+          "default": "openrouter/free",
+          "description": "OpenRouter model slug used for summaries and chat, for example openai/gpt-4.1-mini or openrouter/free"
+        },
         "pullerBear.fetchIntervalMinutes": {
           "type": "number",
           "default": 10,

@@ -5,6 +5,7 @@ import { getPullerBearConfig } from "../config/pullerBearConfig";
 export async function analyzeCode(context: diffContext): Promise<any> {
   const config = getPullerBearConfig();
   const apiKey = config.apiKey;
+  const model = config.model || 'openrouter/free';
 
   if (!apiKey) {
     throw new Error('API key not configured. Please set pullerBear.apiKey in VS Code settings.');
@@ -19,7 +20,7 @@ export async function analyzeCode(context: diffContext): Promise<any> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'openrouter/free',
+      model,
       messages: prompt,
     }),
     signal: AbortSignal.timeout(30000),
@@ -36,6 +37,7 @@ export async function analyzeCode(context: diffContext): Promise<any> {
 export async function askAboutCommit(question: string, reviewJson: string): Promise<string> {
   const config = getPullerBearConfig();
   const apiKey = config.apiKey;
+  const model = config.model || 'openrouter/free';
 
   if (!apiKey) {
     throw new Error('API key not configured. Please set pullerBear.apiKey in VS Code settings.');
@@ -51,7 +53,7 @@ export async function askAboutCommit(question: string, reviewJson: string): Prom
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'openrouter/free',
+      model,
       messages: prompt,
     }),
     signal: AbortSignal.timeout(30000),

@@ -18,7 +18,8 @@ suite('pullerBearConfig', () =>
                     commitWindowMinutes     : 90,
                     warningCommitThreshold  : 4,
                     hardStopCommitThreshold : 8,
-                    branchRef               : 'develop'
+                    branchRef               : 'develop',
+                    model                   : 'openai/gpt-4.1-mini'
                 };
 
                 return values[key] as T;
@@ -41,6 +42,7 @@ suite('pullerBearConfig', () =>
                 warningCommitThreshold  : 4,
                 hardStopCommitThreshold : 8,
                 branchRef               : 'develop',
+                model                   : 'openai/gpt-4.1-mini',
                 apiKey                  : undefined
             });
 
@@ -50,6 +52,7 @@ suite('pullerBearConfig', () =>
                 ['warningCommitThreshold', 2],
                 ['hardStopCommitThreshold', 5],
                 ['branchRef', 'main'],
+                ['model', 'openrouter/free'],
                 ['apiKey', '']
             ]);
         }

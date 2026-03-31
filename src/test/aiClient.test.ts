@@ -16,6 +16,7 @@ suite('aiClient', () =>
                 warningCommitThreshold  : 2,
                 hardStopCommitThreshold : 5,
                 branchRef               : 'main',
+                model                   : 'openrouter/free',
                 apiKey                  : ''
             })) as typeof configModule.getPullerBearConfig
         );
@@ -45,6 +46,7 @@ suite('aiClient', () =>
                 warningCommitThreshold  : 2,
                 hardStopCommitThreshold : 5,
                 branchRef               : 'main',
+                model                   : 'openai/gpt-4.1-mini',
                 apiKey                  : 'secret'
             })) as typeof configModule.getPullerBearConfig
         );
@@ -78,6 +80,7 @@ suite('aiClient', () =>
             assert.match(fetchCalls[0].url, /openrouter/i);
             assert.match(String(fetchCalls[0].init?.headers && JSON.stringify(fetchCalls[0].init.headers)), /secret/);
             assert.match(String(fetchCalls[0].init?.body), /feature\/test/);
+            assert.match(String(fetchCalls[0].init?.body), /openai\/gpt-4\.1-mini/);
         }
         finally
         {
@@ -97,6 +100,7 @@ suite('aiClient', () =>
                 warningCommitThreshold  : 2,
                 hardStopCommitThreshold : 5,
                 branchRef               : 'main',
+                model                   : 'openrouter/free',
                 apiKey                  : 'secret'
             })) as typeof configModule.getPullerBearConfig
         );
@@ -136,6 +140,7 @@ suite('aiClient', () =>
                 warningCommitThreshold  : 2,
                 hardStopCommitThreshold : 5,
                 branchRef               : 'main',
+                model                   : 'openrouter/free',
                 apiKey                  : 'secret'
             })) as typeof configModule.getPullerBearConfig
         );
