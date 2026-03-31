@@ -26,6 +26,8 @@ export function App() {
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+    const [summaryLoadingText, setSummaryLoadingText] = useState('Reading diff and generating summary...');
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -40,6 +42,14 @@ export function App() {
             if (msg.type === 'answerQuestion') {
                 setIsLoading(false);
                 setChatMessages(prev => [...prev, { role: 'assistant', text: msg.answer }]);
+            }
+            if (msg.type === 'loadingState') {
+                setIsSummaryLoading(Boolean(msg.loading));
+                setSummaryLoadingText(
+                    typeof msg.text === 'string' && msg.text.trim().length > 0
+                        ? msg.text
+                        : 'Reading diff and generating summary...'
+                );
             }
         };
         window.addEventListener('message', handler);
@@ -96,6 +106,13 @@ export function App() {
                         </svg>
                     </button>
                 </header>
+
+                {isSummaryLoading && (
+                    <div style={styles.loadingCard}>
+                        <span style={styles.loadingIndicator} aria-hidden="true">...</span>
+                        <span style={styles.loadingText}>{summaryLoadingText}</span>
+                    </div>
+                )}
 
                 {summaries.length === 0 ? (
                     <div style={styles.empty}>
@@ -255,6 +272,26 @@ const styles: Record<string, React.CSSProperties> = {
         background: 'transparent',
         color: 'var(--vscode-foreground)',
         cursor: 'pointer',
+    },
+    loadingCard: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '8px 10px',
+        marginBottom: '10px',
+        borderRadius: '6px',
+        border: '1px solid var(--vscode-panel-border)',
+        background: 'var(--vscode-editor-background)',
+    },
+    loadingIndicator: {
+        color: 'var(--vscode-textLink-foreground)',
+        fontWeight: 700,
+        fontSize: '12px',
+        letterSpacing: '1px',
+    },
+    loadingText: {
+        fontSize: '12px',
+        color: 'var(--vscode-descriptionForeground)',
     },
     empty: {
         color: 'var(--vscode-descriptionForeground)',

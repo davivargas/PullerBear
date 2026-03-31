@@ -223,15 +223,73 @@ export const createCommitSummaryObject = (
     timestamp: Date.now()
 });
 
+function getFriendlyAiErrorMessage(error?: string): string
+{
+    if (!error)
+    {
+        return 'AI summary unavailable because the request failed for an unknown reason.';
+    }
+
+    if (error.includes('API key not configured'))
+    {
+        return 'AI summary unavailable because no API key is configured. Set pullerBear.apiKey in VS Code settings.';
+    }
+
+    if (error.includes('authentication failed'))
+    {
+        return 'AI summary unavailable because OpenRouter rejected your API key. Update pullerBear.apiKey.';
+    }
+
+    if (error.includes('billing or credit limit'))
+    {
+        return 'AI summary unavailable because the OpenRouter account has no available credits or billing is blocked.';
+    }
+
+    if (error.includes('rejected access'))
+    {
+        return 'AI summary unavailable because OpenRouter denied access to this request. Check API key permissions.';
+    }
+
+    if (error.includes('endpoint or model was not found'))
+    {
+        return 'AI summary unavailable because the configured OpenRouter endpoint or model could not be found.';
+    }
+
+    if (error.includes('request timed out') || error.includes('timed out after 30 seconds'))
+    {
+        return 'AI summary unavailable because the OpenRouter request timed out. Try again or reduce the diff size.';
+    }
+
+    if (error.includes('diff was too large'))
+    {
+        return 'AI summary unavailable because the diff was too large for the AI request. Try reviewing a smaller change set.';
+    }
+
+    if (error.includes('rate limit'))
+    {
+        return 'AI summary unavailable because OpenRouter rate-limited the request. Try again in a moment.';
+    }
+
+    if (error.includes('temporarily unavailable'))
+    {
+        return 'AI summary unavailable because OpenRouter is temporarily unavailable. Try again later.';
+    }
+
+    if (error.includes('Could not reach OpenRouter'))
+    {
+        return 'AI summary unavailable because PullerBear could not reach OpenRouter. Check your internet connection, VPN, or firewall.';
+    }
+
+    return `AI summary unavailable because the AI request failed: ${error}`;
+}
+
 /**
  * Creates a fallback commit summary when AI fails
  */
 export function createFallbackSummary(head: any, behindCount: number, upstreamSha: string, error?: string): CommitSummary
 {
     const dedupKey = upstreamSha;
-    const errorMessage = error?.includes('API key not configured')
-        ? 'Please set pullerBear.apiKey in VS Code settings to enable AI summaries.'
-        : 'AI summary unavailable.';
+    const errorMessage = getFriendlyAiErrorMessage(error);
 
     const targetRef = resolveTargetBranchRef(head, getPullerBearConfig().branchRef);
     const [remoteName, ...branchParts] = targetRef.split('/');
@@ -570,7 +628,16 @@ export async function checkRepository(
 
         // Run AI analysis and push results to the sidebar
         console.log(`[PullerBear] Running AI analysis with target ${targetRef} and sha ${targetSha}`);
-        const summary = await runAIAnalysis(repository, head, targetRef, targetSha, behindCount);
+        provider.setLoadingState?.(true, ExplainerViewProvider.defaultLoadingMessage);
+        let summary: CommitSummary | null = null;
+        try
+        {
+            summary = await runAIAnalysis(repository, head, targetRef, targetSha, behindCount);
+        }
+        finally
+        {
+            provider.setLoadingState?.(false);
+        }
 
         if (summary)
         {

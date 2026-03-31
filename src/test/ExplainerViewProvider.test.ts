@@ -8,7 +8,7 @@ import { stubMethod } from './helpers/testUtils';
 
 suite('ExplainerViewProvider', () =>
 {
-    test('resolveWebviewView configures the webview and pushes summaries on ready', async () =>
+    test('resolveWebviewView configures the webview and pushes summaries/loading state on ready', async () =>
     {
         const postedMessages: any[] = [];
         let messageHandler: ((data: any) => void) | undefined;
@@ -45,9 +45,11 @@ suite('ExplainerViewProvider', () =>
 
         messageHandler?.({ type: 'ready' });
 
-        assert.equal(postedMessages.length, 1);
+        assert.equal(postedMessages.length, 2);
         assert.equal(postedMessages[0].type, 'summaries');
         assert.equal(postedMessages[0].data[0].hash, 'old-one');
+        assert.equal(postedMessages[1].type, 'loadingState');
+        assert.equal(postedMessages[1].loading, false);
     });
 
     test('addSummary prepends newest summaries and pushes immediately when mounted', async () =>
@@ -82,7 +84,11 @@ suite('ExplainerViewProvider', () =>
         provider.addSummary(createCommitSummary({ hash: 'second' }));
         messageHandler?.({ type: 'ready' });
 
-        const latestPush = postedMessages[postedMessages.length - 1];
+        const latestPush = postedMessages
+            .slice()
+            .reverse()
+            .find((message) => message.type === 'summaries');
+        assert.ok(latestPush);
         assert.equal(latestPush.data[0].hash, 'second');
         assert.equal(latestPush.data[1].hash, 'first');
     });
@@ -151,15 +157,20 @@ suite('ExplainerViewProvider', () =>
         assert.deepEqual(latestPush.data, []);
     });
 
-    test('refresh message invokes the registered refresh handler', async () =>
+    test('refresh message invokes the registered refresh handler and toggles loading state', async () =>
     {
         let messageHandler: ((data: any) => void | Promise<void>) | undefined;
         const refreshCalls: number[] = [];
+        const postedMessages: any[] = [];
         const webview = {
             options             : undefined,
             html                : '',
             asWebviewUri        : (uri: vscode.Uri): vscode.Uri => uri,
-            postMessage         : async (): Promise<boolean> => true,
+            postMessage         : async (message: any): Promise<boolean> =>
+            {
+                postedMessages.push(message);
+                return true;
+            },
             onDidReceiveMessage : (listener: (data: any) => void | Promise<void>) =>
             {
                 messageHandler = listener;
@@ -181,6 +192,10 @@ suite('ExplainerViewProvider', () =>
         await messageHandler?.({ type: 'refresh' });
 
         assert.equal(refreshCalls.length, 1);
+        const loadingMessages = postedMessages.filter((message) => message.type === 'loadingState');
+        assert.equal(loadingMessages.length >= 2, true);
+        assert.equal(loadingMessages[loadingMessages.length - 2].loading, true);
+        assert.equal(loadingMessages[loadingMessages.length - 1].loading, false);
     });
 
     test('askQuestion reads the review file and posts the AI answer', async () =>

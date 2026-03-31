@@ -69,7 +69,7 @@ suite('repositoryChecker runAIAnalysis', () =>
         }
     });
 
-    test('falls back to a generic summary when AI analysis fails', async () =>
+    test('falls back to a meaningful summary when AI analysis fails', async () =>
     {
         const repository = createRepository();
         const restoreAnalyze = stubMethod(
@@ -91,7 +91,7 @@ suite('repositoryChecker runAIAnalysis', () =>
             }, 'origin/main', 'target-404', 4);
 
             assert.equal(summary?.hash, 'target-404');
-            assert.match(String(summary?.summary), /AI summary unavailable/);
+            assert.match(String(summary?.summary), /could not reach OpenRouter/i);
         }
         finally
         {
