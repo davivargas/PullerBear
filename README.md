@@ -14,10 +14,6 @@ Important: PullerBear uses OpenRouter, so you should choose the model you want t
 - Provides a chat box to ask questions about recent commit reviews.
 - Clears summaries/chat review data after a detected pull/update.
 
-## Demo use case
-
-PullerBear is useful when you want a quick explanation of incoming changes before syncing a busy branch.
-
 ## Requirements
 
 - VS Code `1.110.0` or newer.
